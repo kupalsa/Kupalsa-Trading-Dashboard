@@ -16,12 +16,48 @@ export interface Trade {
   createdAt: string; // ISO timestamp
 }
 
+export const SESSION_OUTCOMES = [
+  "Profitable Day",
+  "Losing Day",
+  "Breakeven Day",
+  "No Trades — No Setup",
+  "No Trades — Missed Opportunity",
+] as const;
+export type SessionOutcome = (typeof SESSION_OUTCOMES)[number];
+
+export const ENTRY_STATES = ["Calm", "Focused", "FOMO", "Hesitation", "Forcing", "Distracted"] as const;
+export type EntryState = (typeof ENTRY_STATES)[number];
+
+export interface DailyReviewChecklist {
+  backtestValid: boolean;
+  executionOnlyFocus: boolean;
+  noInterference: boolean;
+  sessionLogged: boolean;
+  stopEntryTpFollowed: boolean;
+  strategyValid: boolean;
+  structureValid: boolean;
+}
+
+export const emptyChecklist: DailyReviewChecklist = {
+  backtestValid: false,
+  executionOnlyFocus: false,
+  noInterference: false,
+  sessionLogged: false,
+  stopEntryTpFollowed: false,
+  strategyValid: false,
+  structureValid: false,
+};
+
 export interface DailyReview {
   date: string; // YYYY-MM-DD
-  followedRules: boolean;
-  tookGoodTrades: boolean;
-  focusedAndCalm: boolean;
+  sessionOutcome: SessionOutcome | "";
+  entryState: EntryState | "";
+  checklist: DailyReviewChecklist;
   notes: string;
+}
+
+export function isAdherent(review: DailyReview): boolean {
+  return Object.values(review.checklist).every(Boolean);
 }
 
 export interface RulesDoc {

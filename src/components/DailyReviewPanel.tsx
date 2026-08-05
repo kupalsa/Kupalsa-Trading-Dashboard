@@ -1,36 +1,62 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
+import {
+  emptyChecklist,
+  ENTRY_STATES,
+  isAdherent,
+  SESSION_OUTCOMES,
+  type DailyReviewChecklist,
+  type EntryState,
+  type SessionOutcome,
+} from "../lib/types";
 
 function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const CHECKLIST_LABELS: Record<keyof DailyReviewChecklist, string> = {
+  backtestValid: "Backtest Valid",
+  executionOnlyFocus: "Execution Only / Focus",
+  noInterference: "No Interference",
+  sessionLogged: "Session Logged",
+  stopEntryTpFollowed: "Stop → Entry → TP Followed",
+  strategyValid: "Strategy Valid",
+  structureValid: "Structure Valid",
+};
+
 export default function DailyReviewPanel() {
-  const { dailyReviews, saveDailyReview } = useData();
+  const { dailyReviews, trades, saveDailyReview } = useData();
   const [date, setDate] = useState(todayStr());
-  const [followedRules, setFollowedRules] = useState(false);
-  const [tookGoodTrades, setTookGoodTrades] = useState(false);
-  const [focusedAndCalm, setFocusedAndCalm] = useState(false);
+  const [sessionOutcome, setSessionOutcome] = useState<SessionOutcome | "">("");
+  const [entryState, setEntryState] = useState<EntryState | "">("");
+  const [checklist, setChecklist] = useState<DailyReviewChecklist>(emptyChecklist);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     const existing = dailyReviews.find((r) => r.date === date);
-    setFollowedRules(existing?.followedRules ?? false);
-    setTookGoodTrades(existing?.tookGoodTrades ?? false);
-    setFocusedAndCalm(existing?.focusedAndCalm ?? false);
+    setSessionOutcome(existing?.sessionOutcome ?? "");
+    setEntryState(existing?.entryState ?? "");
+    setChecklist(existing?.checklist ?? emptyChecklist);
     setNotes(existing?.notes ?? "");
     setSaved(false);
   }, [date, dailyReviews]);
 
-  const adherent = followedRules && tookGoodTrades && focusedAndCalm;
+  const dayTrades = useMemo(() => trades.filter((t) => t.date === date), [trades, date]);
+  const totalR = useMemo(() => dayTrades.reduce((sum, t) => sum + t.rr, 0), [dayTrades]);
+
+  const adherent = isAdherent({ date, sessionOutcome, entryState, checklist, notes });
+
+  function toggle(key: keyof DailyReviewChecklist) {
+    setChecklist((c) => ({ ...c, [key]: !c[key] }));
+  }
 
   async function handleSave() {
     setSaving(true);
     try {
-      await saveDailyReview({ date, followedRules, tookGoodTrades, focusedAndCalm, notes });
+      await saveDailyReview({ date, sessionOutcome, entryState, checklist, notes });
       setSaved(true);
     } finally {
       setSaving(false);
@@ -40,41 +66,67 @@ export default function DailyReviewPanel() {
   return (
     <div className="panel">
       <h2>End of Day Review</h2>
-      <div className="field" style={{ marginBottom: 10, maxWidth: 180 }}>
-        <label>Date</label>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+
+      <div className="row" style={{ marginBottom: 12 }}>
+        <div className="field" style={{ maxWidth: 180 }}>
+          <label>Date</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Num of trades</label>
+          <input value={dayTrades.length} disabled style={{ width: 80 }} />
+        </div>
+        <div className="field">
+          <label>Total R</label>
+          <input
+            value={totalR.toFixed(2)}
+            disabled
+            style={{ width: 80, color: totalR > 0 ? "var(--green)" : totalR < 0 ? "var(--red)" : undefined }}
+          />
+        </div>
       </div>
 
-      <div className="checkbox-row" style={{ marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={followedRules}
-          onChange={(e) => setFollowedRules(e.target.checked)}
-          id="rules"
-        />
-        <label htmlFor="rules">I followed my rules today</label>
+      <div className="row" style={{ marginBottom: 12 }}>
+        <div className="field">
+          <label>Session Outcome</label>
+          <select value={sessionOutcome} onChange={(e) => setSessionOutcome(e.target.value as SessionOutcome)}>
+            <option value="">—</option>
+            {SESSION_OUTCOMES.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>Entry State</label>
+          <select value={entryState} onChange={(e) => setEntryState(e.target.value as EntryState)}>
+            <option value="">—</option>
+            {ENTRY_STATES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-      <div className="checkbox-row" style={{ marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={tookGoodTrades}
-          onChange={(e) => setTookGoodTrades(e.target.checked)}
-          id="good-trades"
-        />
-        <label htmlFor="good-trades">I took good trades</label>
-      </div>
-      <div className="checkbox-row" style={{ marginBottom: 12 }}>
-        <input
-          type="checkbox"
-          checked={focusedAndCalm}
-          onChange={(e) => setFocusedAndCalm(e.target.checked)}
-          id="focused"
-        />
-        <label htmlFor="focused">I was focused and calm</label>
+
+      <div style={{ marginBottom: 12 }}>
+        {(Object.keys(CHECKLIST_LABELS) as (keyof DailyReviewChecklist)[]).map((key) => (
+          <div className="checkbox-row" style={{ marginBottom: 6 }} key={key}>
+            <input
+              type="checkbox"
+              id={key}
+              checked={checklist[key]}
+              onChange={() => toggle(key)}
+            />
+            <label htmlFor={key}>{CHECKLIST_LABELS[key]}</label>
+          </div>
+        ))}
       </div>
 
       <div className="field" style={{ marginBottom: 12 }}>
-        <label>Notes</label>
+        <label>Note</label>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" />
       </div>
 

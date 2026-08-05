@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import MonthCalendar from "../components/MonthCalendar";
-import { summarize, tradesForMonth } from "../lib/stats";
+import { adherentRate, reviewsForMonth, summarize, tradesForMonth } from "../lib/stats";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -9,7 +9,7 @@ const MONTH_NAMES = [
 ];
 
 export default function StatsPage() {
-  const { trades, githubReady, loading } = useData();
+  const { trades, dailyReviews, githubReady, loading } = useData();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -17,6 +17,10 @@ export default function StatsPage() {
   const monthTrades = useMemo(() => tradesForMonth(trades, year, month), [trades, year, month]);
   const summary = useMemo(() => summarize(monthTrades), [monthTrades]);
   const overall = useMemo(() => summarize(trades), [trades]);
+
+  const monthReviews = useMemo(() => reviewsForMonth(dailyReviews, year, month), [dailyReviews, year, month]);
+  const monthAdherence = useMemo(() => adherentRate(monthReviews), [monthReviews]);
+  const overallAdherence = useMemo(() => adherentRate(dailyReviews), [dailyReviews]);
 
   function shiftMonth(delta: number) {
     let m = month + delta;
@@ -96,6 +100,10 @@ export default function StatsPage() {
             <div className="label">Avg Exit Hour</div>
             <div className="value">{summary.avgExitHour}</div>
           </div>
+          <div className="stat-tile">
+            <div className="label">Adherent Sessions</div>
+            <div className="value">{monthReviews.length ? `${monthAdherence.toFixed(0)}%` : "—"}</div>
+          </div>
         </div>
       </div>
 
@@ -119,6 +127,10 @@ export default function StatsPage() {
           <div className="stat-tile">
             <div className="label">Trades / Week</div>
             <div className="value">{overall.tradesPerWeek.toFixed(1)}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">Adherent Sessions</div>
+            <div className="value">{dailyReviews.length ? `${overallAdherence.toFixed(0)}%` : "—"}</div>
           </div>
         </div>
       </div>

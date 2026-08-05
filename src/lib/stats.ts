@@ -1,4 +1,4 @@
-import type { Trade } from "./types";
+import { isAdherent, type DailyReview, type Trade } from "./types";
 
 export interface MonthSummary {
   totalR: number;
@@ -37,6 +37,22 @@ export function tradesForMonth(
 ): Trade[] {
   const prefix = `${year}-${String(month).padStart(2, "0")}`;
   return trades.filter((t) => t.date.startsWith(prefix));
+}
+
+export function reviewsForMonth(
+  reviews: DailyReview[],
+  year: number,
+  month: number, // 1-12
+): DailyReview[] {
+  const prefix = `${year}-${String(month).padStart(2, "0")}`;
+  return reviews.filter((r) => r.date.startsWith(prefix));
+}
+
+/** Percentage (0-100) of reviews where every checklist item is checked. */
+export function adherentRate(reviews: DailyReview[]): number {
+  if (reviews.length === 0) return 0;
+  const adherentCount = reviews.filter(isAdherent).length;
+  return (adherentCount / reviews.length) * 100;
 }
 
 /** Net R for each date within the trades list. */

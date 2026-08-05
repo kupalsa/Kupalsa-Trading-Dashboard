@@ -7,12 +7,27 @@ export interface ExtractedTrade {
   exitTime: string | null; // HH:MM
   direction: "Long" | "Short" | null;
   result: "W" | "L" | "BE" | null;
-  stopPoints: number | null;
+  stopPoints: number | null; // point distance, computed from entryPrice/stopPrice
 }
 
-const SYSTEM_PROMPT = `You look at a screenshot of a trading platform (e.g. TradingView) showing an entered or closed trade. Extract what is visible into strict JSON only, no prose, matching exactly this shape:
-{"date": "YYYY-MM-DD or null", "entryTime": "HH:MM 24h or null", "exitTime": "HH:MM 24h or null", "direction": "Long" | "Short" | null, "result": "W" | "L" | "BE" | null, "stopPoints": number or null}
-If a field is not visible or you are not confident, use null for it. Respond with only the JSON object, nothing else.`;
+const SYSTEM_PROMPT = `You read a TradingView screenshot of a single gold-futures trade, usually drawn with the Long/Short Position tool. Extract what is visible into strict JSON only, no prose, matching exactly this shape:
+{"date": "YYYY-MM-DD or null", "entryTime": "HH:MM 24h or null", "exitTime": "HH:MM 24h or null", "direction": "Long" | "Short" | null, "entryPrice": number or null, "stopPrice": number or null, "result": "W" | "L" | "BE" | null}
+
+Report only what is visible. If a value is unreadable or not shown, use null for it rather than guessing.
+
+How to read the Long/Short Position tool drawing, if present:
+- It shows two stacked coloured boxes sharing one horizontal boundary line — that line is the entry.
+- The gray box is always the stop side. The coloured box (green/orange/blue/yellow/red) is always the profit side.
+- If the gray box is below the entry line and the coloured box is above it, direction is "Long". If the gray box is above the entry line and the coloured box is below it, direction is "Short".
+- Read entryPrice from the price-axis label at the entry boundary line, and stopPrice from the price-axis label at the outer edge of the gray box (bottom edge for Long, top edge for Short). Read these from the printed axis labels, not by estimating against gridlines. Report each to one decimal place.
+
+How to read the result, if determinable from this image:
+- "W": price reached the far edge of the coloured (profit) box before touching the gray box.
+- "L": price reached the outer edge of the gray box first.
+- "BE": price returned to the entry line and the trade closed there.
+- If price never touched the entry line, or you cannot tell which level was hit first from this single image, use null for result rather than guessing.
+
+Respond with only the JSON object, nothing else.`;
 
 export async function extractTradeFromScreenshot(
   s: AppSettings,
@@ -61,13 +76,19 @@ export async function extractTradeFromScreenshot(
   if (!jsonMatch) throw new Error("Could not parse AI response as JSON");
   const parsed = JSON.parse(jsonMatch[0]);
 
+  const entryPrice = typeof parsed.entryPrice === "number" ? parsed.entryPrice : null;
+  const stopPrice = typeof parsed.stopPrice === "number" ? parsed.stopPrice : null;
+  const stopPoints =
+    entryPrice != null && stopPrice != null
+      ? Math.round(Math.abs(entryPrice - stopPrice) * 100) / 100
+      : null;
+
   return {
     date: parsed.date ?? null,
     entryTime: parsed.entryTime ?? null,
     exitTime: parsed.exitTime ?? null,
     direction: parsed.direction ?? null,
     result: parsed.result ?? null,
-    stopPoints:
-      typeof parsed.stopPoints === "number" ? parsed.stopPoints : null,
+    stopPoints,
   };
 }
