@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useData } from "../lib/DataContext";
 import { compressImage } from "../lib/image";
 import { extractTradeFromScreenshot } from "../lib/extract";
@@ -35,7 +35,7 @@ export default function TradeForm() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  async function handleFile(file: File) {
+  const handleFile = useCallback(async (file: File) => {
     setMessage(null);
     const compressed = await compressImage(file);
     setScreenshotDataUrl(compressed);
@@ -59,7 +59,21 @@ export default function TradeForm() {
         setExtracting(false);
       }
     }
-  }
+  }, [settings]);
+
+  // Allow pasting a screenshot anywhere on the page, not just inside the dropzone.
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith("image/"));
+      const file = item?.getAsFile();
+      if (file) {
+        e.preventDefault();
+        handleFile(file);
+      }
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [handleFile]);
 
   function resetForm() {
     setForm({ ...emptyForm, date: todayStr() });

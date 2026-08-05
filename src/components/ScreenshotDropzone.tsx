@@ -45,7 +45,7 @@ export default function ScreenshotDropzone({ previewUrl, onFile, onClear, busy }
       onPaste={handlePaste}
       tabIndex={0}
     >
-      Click, drag a file, or paste a screenshot here
+      Press Ctrl+V to paste a screenshot, or click / drag a file here
       <input
         ref={inputRef}
         type="file"
