@@ -13,6 +13,10 @@ dist
 dist-ssr
 *.local
 
+# Trade data lives in a separate private repo, not this (public) code repo
+/data
+/screenshots
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
