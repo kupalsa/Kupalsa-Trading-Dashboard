@@ -1,0 +1,185 @@
+import { useState } from "react";
+import { useData } from "../lib/DataContext";
+import { compressImage } from "../lib/image";
+import { extractTradeFromScreenshot } from "../lib/extract";
+import { dayOfWeek } from "../lib/stats";
+import { isAnthropicConfigured } from "../lib/settings";
+import type { Direction, Result, Trade } from "../lib/types";
+import ScreenshotDropzone from "./ScreenshotDropzone";
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const emptyForm = {
+  date: todayStr(),
+  entryTime: "",
+  exitTime: "",
+  direction: "Long" as Direction,
+  result: "W" as Result,
+  stopPoints: "",
+  rr: "",
+  note: "",
+};
+
+export default function TradeForm() {
+  const { settings, addTrade, saveScreenshot } = useData();
+  const [form, setForm] = useState(emptyForm);
+  const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function handleFile(file: File) {
+    setMessage(null);
+    const compressed = await compressImage(file);
+    setScreenshotDataUrl(compressed);
+
+    if (isAnthropicConfigured(settings)) {
+      setExtracting(true);
+      try {
+        const extracted = await extractTradeFromScreenshot(settings, compressed);
+        setForm((f) => ({
+          ...f,
+          date: extracted.date ?? f.date,
+          entryTime: extracted.entryTime ?? f.entryTime,
+          exitTime: extracted.exitTime ?? f.exitTime,
+          direction: extracted.direction ?? f.direction,
+          result: extracted.result ?? f.result,
+          stopPoints: extracted.stopPoints != null ? String(extracted.stopPoints) : f.stopPoints,
+        }));
+      } catch (e) {
+        setMessage({ kind: "error", text: `AI extraction failed: ${e instanceof Error ? e.message : e}` });
+      } finally {
+        setExtracting(false);
+      }
+    }
+  }
+
+  function resetForm() {
+    setForm({ ...emptyForm, date: todayStr() });
+    setScreenshotDataUrl(null);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setMessage(null);
+    try {
+      const id = crypto.randomUUID();
+      const screenshotPath = screenshotDataUrl ? `screenshots/${id}.jpg` : null;
+
+      const trade: Trade = {
+        id,
+        date: form.date,
+        day: dayOfWeek(form.date),
+        entryTime: form.entryTime,
+        exitTime: form.exitTime,
+        direction: form.direction,
+        result: form.result,
+        stopPoints: form.stopPoints ? Number(form.stopPoints) : 0,
+        rr: form.rr ? Number(form.rr) : form.result === "L" ? -1 : 0,
+        screenshotPath,
+        note: form.note,
+        createdAt: new Date().toISOString(),
+      };
+
+      await addTrade(trade);
+      if (screenshotDataUrl && screenshotPath) {
+        const base64 = screenshotDataUrl.split(",")[1] ?? "";
+        await saveScreenshot(screenshotPath, base64);
+      }
+
+      setMessage({ kind: "ok", text: "Trade saved" });
+      resetForm();
+    } catch (e) {
+      setMessage({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className="panel" onSubmit={handleSubmit}>
+      <h2>Log a Trade</h2>
+
+      <div className="row" style={{ marginBottom: 12 }}>
+        <ScreenshotDropzone
+          previewUrl={screenshotDataUrl}
+          onFile={handleFile}
+          onClear={() => setScreenshotDataUrl(null)}
+          busy={extracting}
+        />
+      </div>
+
+      <div className="row" style={{ marginBottom: 10 }}>
+        <div className="field">
+          <label>Date</label>
+          <input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} required />
+        </div>
+        <div className="field">
+          <label>Day</label>
+          <input value={dayOfWeek(form.date)} disabled />
+        </div>
+        <div className="field">
+          <label>Entry time</label>
+          <input type="time" value={form.entryTime} onChange={(e) => set("entryTime", e.target.value)} required />
+        </div>
+        <div className="field">
+          <label>Exit time</label>
+          <input type="time" value={form.exitTime} onChange={(e) => set("exitTime", e.target.value)} />
+        </div>
+      </div>
+
+      <div className="row" style={{ marginBottom: 10 }}>
+        <div className="field">
+          <label>Direction</label>
+          <select value={form.direction} onChange={(e) => set("direction", e.target.value as Direction)}>
+            <option value="Long">Long</option>
+            <option value="Short">Short</option>
+          </select>
+        </div>
+        <div className="field">
+          <label>Result</label>
+          <select value={form.result} onChange={(e) => set("result", e.target.value as Result)}>
+            <option value="W">Win</option>
+            <option value="L">Loss</option>
+            <option value="BE">Break-even</option>
+          </select>
+        </div>
+        <div className="field">
+          <label>Stop (pts.)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={form.stopPoints}
+            onChange={(e) => set("stopPoints", e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label>RR</label>
+          <input type="number" step="0.01" value={form.rr} onChange={(e) => set("rr", e.target.value)} />
+        </div>
+      </div>
+
+      <div className="field" style={{ marginBottom: 12 }}>
+        <label>Note</label>
+        <textarea value={form.note} onChange={(e) => set("note", e.target.value)} placeholder="Optional note" />
+      </div>
+
+      <div className="row">
+        <button type="submit" className="primary" disabled={saving || extracting}>
+          {saving ? "Saving…" : "Save trade"}
+        </button>
+        {message && (
+          <span className={message.kind === "ok" ? "success-text" : "error-text"}>{message.text}</span>
+        )}
+      </div>
+    </form>
+  );
+}
