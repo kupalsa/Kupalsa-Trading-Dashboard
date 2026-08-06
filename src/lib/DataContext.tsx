@@ -10,6 +10,7 @@ import {
 import { loadSettings, saveSettings, isGithubConfigured, type AppSettings } from "./settings";
 import { readJSON, writeBinary, writeJSON } from "./githubStore";
 import { emptyRulesDoc, type DailyReview, type RulesDoc, type Trade } from "./types";
+import type { Opportunity } from "./backtest";
 
 interface DataContextValue {
   settings: AppSettings;
@@ -19,6 +20,7 @@ interface DataContextValue {
   trades: Trade[];
   dailyReviews: DailyReview[];
   rules: RulesDoc;
+  opportunities: Opportunity[];
   loading: boolean;
   error: string | null;
 
@@ -29,6 +31,10 @@ interface DataContextValue {
   saveScreenshot: (path: string, base64: string) => Promise<void>;
   saveDailyReview: (r: DailyReview) => Promise<void>;
   saveRules: (r: RulesDoc) => Promise<void>;
+
+  saveOpportunity: (o: Opportunity) => Promise<void>;
+  deleteOpportunity: (id: string) => Promise<void>;
+  saveBacktestScreenshot: (path: string, base64: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -36,12 +42,14 @@ const DataContext = createContext<DataContextValue | null>(null);
 const TRADES_PATH = "data/trades.json";
 const REVIEWS_PATH = "data/daily-reviews.json";
 const RULES_PATH = "data/rules.json";
+const OPPORTUNITIES_PATH = "data/opportunities.json";
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   const [trades, setTrades] = useState<Trade[]>([]);
   const [dailyReviews, setDailyReviews] = useState<DailyReview[]>([]);
   const [rules, setRules] = useState<RulesDoc>(emptyRulesDoc);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,14 +65,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const [t, r, rl] = await Promise.all([
+      const [t, r, rl, ops] = await Promise.all([
         readJSON<Trade[]>(settings, TRADES_PATH, []),
         readJSON<DailyReview[]>(settings, REVIEWS_PATH, []),
         readJSON<RulesDoc>(settings, RULES_PATH, emptyRulesDoc),
+        readJSON<Opportunity[]>(settings, OPPORTUNITIES_PATH, []),
       ]);
       setTrades(t);
       setDailyReviews(r);
       setRules(rl);
+      setOpportunities(ops);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -133,6 +143,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [settings],
   );
 
+  const persistOpportunities = useCallback(
+    async (next: Opportunity[], message: string) => {
+      setOpportunities(next);
+      await writeJSON(settings, OPPORTUNITIES_PATH, next, message);
+    },
+    [settings],
+  );
+
+  /** Upsert by id, keeping the log ordered by date then sequence. */
+  const saveOpportunity = useCallback(
+    async (o: Opportunity) => {
+      const exists = opportunities.some((x) => x.id === o.id);
+      const next = (exists
+        ? opportunities.map((x) => (x.id === o.id ? o : x))
+        : [...opportunities, o]
+      ).sort((a, b) => a.date.localeCompare(b.date) || a.seq - b.seq);
+      await persistOpportunities(
+        next,
+        `${exists ? "Update" : "Add"} opportunity #${o.seq}${o.date ? ` (${o.date})` : ""}`,
+      );
+    },
+    [opportunities, persistOpportunities],
+  );
+
+  const deleteOpportunity = useCallback(
+    async (id: string) => {
+      const target = opportunities.find((x) => x.id === id);
+      await persistOpportunities(
+        opportunities.filter((x) => x.id !== id),
+        `Delete opportunity #${target?.seq ?? ""}`,
+      );
+    },
+    [opportunities, persistOpportunities],
+  );
+
+  const saveBacktestScreenshot = useCallback(
+    async (path: string, base64: string) => {
+      await writeBinary(settings, path, base64, "Add backtest screenshot");
+    },
+    [settings],
+  );
+
   const value = useMemo<DataContextValue>(
     () => ({
       settings,
@@ -141,6 +193,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       trades,
       dailyReviews,
       rules,
+      opportunities,
       loading,
       error,
       refresh,
@@ -150,6 +203,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       saveScreenshot,
       saveDailyReview,
       saveRules,
+      saveOpportunity,
+      deleteOpportunity,
+      saveBacktestScreenshot,
     }),
     [
       settings,
@@ -158,6 +214,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       trades,
       dailyReviews,
       rules,
+      opportunities,
       loading,
       error,
       refresh,
@@ -167,6 +224,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       saveScreenshot,
       saveDailyReview,
       saveRules,
+      saveOpportunity,
+      deleteOpportunity,
+      saveBacktestScreenshot,
     ],
   );
 

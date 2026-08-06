@@ -311,6 +311,149 @@ textarea {
   gap: 8px;
 }
 
+/* --- Backtest / opportunity form --- */
+
+.field-group {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-bottom: 16px;
+}
+
+.field-group h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.field-group .row {
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+
+.bool-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+  padding-bottom: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bool-field input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+}
+
+.derived-value {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.lock-btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.setup-help {
+  background: var(--bg-panel-2);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.notice {
+  background: rgba(91, 140, 255, 0.08);
+  border-left: 2px solid var(--accent);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  border-radius: 0 6px 6px 0;
+  margin: 0 0 16px;
+}
+
+.notice.warn {
+  background: rgba(224, 185, 92, 0.08);
+  border-left-color: var(--amber);
+}
+
+.shot-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shot-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.shot-list button {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+.toggle-group {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.toggle-group button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.toggle-group button.active {
+  background: var(--accent);
+  color: #0d0f12;
+  font-weight: 600;
+}
+
+.small-note {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.low-sample {
+  opacity: 0.55;
+}
+
+.scroll-x {
+  overflow-x: auto;
+}
+
 .checkbox-row input[type="checkbox"] {
   width: 16px;
   height: 16px;
