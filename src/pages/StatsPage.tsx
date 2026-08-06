@@ -1,26 +1,48 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import MonthCalendar from "../components/MonthCalendar";
 import { adherentRate, reviewsForMonth, summarize, tradesForMonth } from "../lib/stats";
+import { MAX_ZOOM, MIN_ZOOM, useUiZoom } from "../lib/useUiZoom";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
 
+function Tile({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="stat-tile">
+      <div className="label">{label}</div>
+      <div className="value" style={color ? { color } : undefined}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export default function StatsPage() {
   const { trades, dailyReviews, githubReady, loading } = useData();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [fitMode, setFitMode] = useState(true);
+  const { zoom, setZoom, fit } = useUiZoom();
 
   const monthTrades = useMemo(() => tradesForMonth(trades, year, month), [trades, year, month]);
   const summary = useMemo(() => summarize(monthTrades), [monthTrades]);
   const overall = useMemo(() => summarize(trades), [trades]);
 
-  const monthReviews = useMemo(() => reviewsForMonth(dailyReviews, year, month), [dailyReviews, year, month]);
+  const monthReviews = useMemo(
+    () => reviewsForMonth(dailyReviews, year, month),
+    [dailyReviews, year, month],
+  );
   const monthAdherence = useMemo(() => adherentRate(monthReviews), [monthReviews]);
   const overallAdherence = useMemo(() => adherentRate(dailyReviews), [dailyReviews]);
+
+  // Re-fit when the data or month changes the content height.
+  useEffect(() => {
+    if (fitMode) fit();
+  }, [fitMode, fit, year, month, trades.length, dailyReviews.length]);
 
   function shiftMonth(delta: number) {
     let m = month + delta;
@@ -36,105 +58,101 @@ export default function StatsPage() {
     setYear(y);
   }
 
+  function manualZoom(next: number) {
+    setFitMode(false);
+    setZoom(next);
+  }
+
   if (!githubReady) {
     return <div className="panel">Connect GitHub in Settings to see stats.</div>;
   }
 
+  const rColor = (v: number) => (v > 0 ? "var(--green)" : v < 0 ? "var(--red)" : undefined);
+
   return (
-    <div>
-      <h1 style={{ marginBottom: 16 }}>Stats</h1>
-      {loading && <p className="muted">Loading…</p>}
-
-      <div className="panel">
-        <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-          <div className="row">
-            <button onClick={() => shiftMonth(-1)}>&larr;</button>
-            <h2 style={{ margin: 0, textTransform: "none", fontSize: 16, color: "var(--text)" }}>
-              {MONTH_NAMES[month - 1]} {year}
-            </h2>
-            <button onClick={() => shiftMonth(1)}>&rarr;</button>
-          </div>
+    <div className={fitMode ? "stats-page fit" : "stats-page"}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="row">
+          <button onClick={() => shiftMonth(-1)}>&larr;</button>
+          <h1 style={{ margin: 0, fontSize: 20, minWidth: 168, textAlign: "center" }}>
+            {MONTH_NAMES[month - 1]} {year}
+          </h1>
+          <button onClick={() => shiftMonth(1)}>&rarr;</button>
+          {loading && <span className="muted">Loading…</span>}
         </div>
-        <MonthCalendar year={year} month={month} trades={monthTrades} />
 
-        <div className="stat-grid" style={{ marginTop: 16 }}>
-          <div className="stat-tile">
-            <div className="label">Total R (month)</div>
-            <div className="value" style={{ color: summary.totalR >= 0 ? "var(--green)" : "var(--red)" }}>
-              {summary.totalR.toFixed(2)}
-            </div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Win Rate</div>
-            <div className="value">{summary.winRate.toFixed(0)}%</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Trades</div>
-            <div className="value">{summary.numTrades}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Avg R / Trade</div>
-            <div className="value">{summary.avgR.toFixed(2)}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Winning Days</div>
-            <div className="value" style={{ color: "var(--green)" }}>{summary.winningDays}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Losing Days</div>
-            <div className="value" style={{ color: "var(--red)" }}>{summary.losingDays}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Adherent Sessions</div>
-            <div className="value">{monthReviews.length ? `${monthAdherence.toFixed(0)}%` : "—"}</div>
-          </div>
+        <div className="zoom-controls">
+          <button
+            className={fitMode ? "active" : ""}
+            onClick={() => setFitMode(true)}
+            title="Scale so everything fits on screen"
+            style={fitMode ? { borderColor: "var(--accent)", color: "var(--accent)" } : undefined}
+          >
+            Fit
+          </button>
+          <button onClick={() => manualZoom(zoom - 0.1)} disabled={zoom <= MIN_ZOOM}>
+            −
+          </button>
+          <span className="zoom-readout">{Math.round(zoom * 100)}%</span>
+          <button onClick={() => manualZoom(zoom + 0.1)} disabled={zoom >= MAX_ZOOM}>
+            +
+          </button>
+          <button onClick={() => manualZoom(1)}>Reset</button>
         </div>
       </div>
 
-      <div className="panel">
-        <h2>All-time Overview</h2>
-        <div className="stat-grid">
-          <div className="stat-tile">
-            <div className="label">Total R</div>
-            <div className="value" style={{ color: overall.totalR >= 0 ? "var(--green)" : "var(--red)" }}>
-              {overall.totalR.toFixed(2)}
+      <div className="stats-body">
+        <div className="panel">
+          <h2>Daily R</h2>
+          <MonthCalendar year={year} month={month} trades={monthTrades} />
+        </div>
+
+        <div className="stats-side">
+          <div className="panel">
+            <h2>{MONTH_NAMES[month - 1]}</h2>
+            <div className="stat-grid">
+              <Tile
+                label="Total R"
+                value={summary.totalR.toFixed(2)}
+                color={rColor(summary.totalR)}
+              />
+              <Tile label="Win Rate" value={`${summary.winRate.toFixed(0)}%`} />
+              <Tile label="Trades" value={String(summary.numTrades)} />
+              <Tile label="Avg R / Trade" value={summary.avgR.toFixed(2)} />
+              <Tile
+                label="Winning Days"
+                value={String(summary.winningDays)}
+                color="var(--green)"
+              />
+              <Tile label="Losing Days" value={String(summary.losingDays)} color="var(--red)" />
+              <Tile
+                label="Adherent"
+                value={monthReviews.length ? `${monthAdherence.toFixed(0)}%` : "—"}
+              />
             </div>
           </div>
-          <div className="stat-tile">
-            <div className="label">Win Rate</div>
-            <div className="value">{overall.winRate.toFixed(0)}%</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Total Trades</div>
-            <div className="value">{overall.numTrades}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Trades / Week</div>
-            <div className="value">{overall.tradesPerWeek.toFixed(1)}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Adherent Sessions</div>
-            <div className="value">{dailyReviews.length ? `${overallAdherence.toFixed(0)}%` : "—"}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Avg Trade Duration</div>
-            <div className="value">{overall.avgTradeDuration}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Max Win Streak</div>
-            <div className="value">{overall.maxWinStreak}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Max Loss Streak</div>
-            <div className="value">{overall.maxLossStreak}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Avg Entry Hour</div>
-            <div className="value">{overall.avgEntryHour}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Avg Exit Hour</div>
-            <div className="value">{overall.avgExitHour}</div>
+
+          <div className="panel">
+            <h2>All time</h2>
+            <div className="stat-grid">
+              <Tile
+                label="Total R"
+                value={overall.totalR.toFixed(2)}
+                color={rColor(overall.totalR)}
+              />
+              <Tile label="Win Rate" value={`${overall.winRate.toFixed(0)}%`} />
+              <Tile label="Trades" value={String(overall.numTrades)} />
+              <Tile label="Trades / Week" value={overall.tradesPerWeek.toFixed(1)} />
+              <Tile
+                label="Adherent"
+                value={dailyReviews.length ? `${overallAdherence.toFixed(0)}%` : "—"}
+              />
+              <Tile label="Avg Duration" value={overall.avgTradeDuration} />
+              <Tile label="Max Win Streak" value={String(overall.maxWinStreak)} />
+              <Tile label="Max Loss Streak" value={String(overall.maxLossStreak)} />
+              <Tile label="Avg Entry" value={overall.avgEntryHour} />
+              <Tile label="Avg Exit" value={overall.avgExitHour} />
+            </div>
           </div>
         </div>
       </div>

@@ -17,7 +17,7 @@ function todayStr(): string {
 
 const CHECKLIST_LABELS: Record<keyof DailyReviewChecklist, string> = {
   backtestValid: "Backtest Valid",
-  executionOnlyFocus: "Execution Only / Focus",
+  executionOnlyFocus: "Focus on Perfect Execution",
   noInterference: "No Interference",
   sessionLogged: "Session Logged",
   stopEntryTpFollowed: "Stop → Entry → TP Followed",

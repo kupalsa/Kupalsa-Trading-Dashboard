@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { DataProvider, useData } from "./lib/DataContext";
+import { applyTheme, loadTheme, type Theme } from "./lib/theme";
+import SessionReminder from "./components/SessionReminder";
 import LogPage from "./pages/LogPage";
 import StatsPage from "./pages/StatsPage";
 import RulesPage from "./pages/RulesPage";
@@ -8,9 +11,15 @@ import SettingsPage from "./pages/SettingsPage";
 
 function Sidebar() {
   const { githubReady } = useData();
+  const [theme, setTheme] = useState<Theme>(() => loadTheme());
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
   return (
     <nav className="sidebar">
-      <h1>Trading Dashboard</h1>
+      <h1>Trading Journal</h1>
       <NavLink to="/" end>
         Log
       </NavLink>
@@ -20,6 +29,15 @@ function Sidebar() {
       <NavLink to="/settings">
         Settings {!githubReady && <span style={{ color: "var(--amber)" }}>●</span>}
       </NavLink>
+
+      <div className="sidebar-footer">
+        <button
+          className="theme-toggle"
+          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+        >
+          {theme === "light" ? "◗ Dark theme" : "◖ Light theme"}
+        </button>
+      </div>
     </nav>
   );
 }
@@ -37,6 +55,7 @@ function AppShell() {
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>
+      <SessionReminder />
     </div>
   );
 }
