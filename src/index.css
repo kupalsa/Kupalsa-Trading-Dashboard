@@ -234,7 +234,7 @@ th {
 
 .calendar-header, .calendar-week {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 8px;
 }
 
@@ -256,6 +256,11 @@ th {
 .day-cell.empty {
   border: none;
   background: transparent;
+}
+
+.day-cell.weekend {
+  background: transparent;
+  border-style: dashed;
 }
 
 .day-cell .date-num {

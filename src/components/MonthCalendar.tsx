@@ -19,6 +19,8 @@ export default function MonthCalendar({ year, month, trades }: Props) {
         <div>Wed</div>
         <div>Thu</div>
         <div>Fri</div>
+        <div>Sat</div>
+        <div>Sun</div>
       </div>
       {weeks.map((week, wi) => (
         <div className="calendar-week" key={wi}>
@@ -26,8 +28,10 @@ export default function MonthCalendar({ year, month, trades }: Props) {
             if (!date) return <div className="day-cell empty" key={di} />;
             const r = perDay.get(date);
             const dayNum = Number(date.split("-")[2]);
+            const isWeekend = di >= 5;
+            const base = isWeekend ? "day-cell weekend" : "day-cell";
             const cls =
-              r === undefined || r === 0 ? "day-cell" : r > 0 ? "day-cell win-day" : "day-cell loss-day";
+              r === undefined || r === 0 ? base : r > 0 ? `${base} win-day` : `${base} loss-day`;
             return (
               <div className={cls} key={di}>
                 <div className="date-num">{dayNum}</div>

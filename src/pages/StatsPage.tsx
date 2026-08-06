@@ -85,22 +85,6 @@ export default function StatsPage() {
             <div className="value" style={{ color: "var(--red)" }}>{summary.losingDays}</div>
           </div>
           <div className="stat-tile">
-            <div className="label">Max Win Streak</div>
-            <div className="value">{summary.maxWinStreak}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Max Loss Streak</div>
-            <div className="value">{summary.maxLossStreak}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Avg Entry Hour</div>
-            <div className="value">{summary.avgEntryHour}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="label">Avg Exit Hour</div>
-            <div className="value">{summary.avgExitHour}</div>
-          </div>
-          <div className="stat-tile">
             <div className="label">Adherent Sessions</div>
             <div className="value">{monthReviews.length ? `${monthAdherence.toFixed(0)}%` : "—"}</div>
           </div>
@@ -131,6 +115,26 @@ export default function StatsPage() {
           <div className="stat-tile">
             <div className="label">Adherent Sessions</div>
             <div className="value">{dailyReviews.length ? `${overallAdherence.toFixed(0)}%` : "—"}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">Avg Trade Duration</div>
+            <div className="value">{overall.avgTradeDuration}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">Max Win Streak</div>
+            <div className="value">{overall.maxWinStreak}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">Max Loss Streak</div>
+            <div className="value">{overall.maxLossStreak}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">Avg Entry Hour</div>
+            <div className="value">{overall.avgEntryHour}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">Avg Exit Hour</div>
+            <div className="value">{overall.avgExitHour}</div>
           </div>
         </div>
       </div>

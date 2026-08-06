@@ -82,11 +82,15 @@ export default function TradeForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!screenshotDataUrl) {
+      setMessage({ kind: "error", text: "A screenshot is required before saving a trade." });
+      return;
+    }
     setSaving(true);
     setMessage(null);
     try {
       const id = crypto.randomUUID();
-      const screenshotPath = screenshotDataUrl ? `screenshots/${id}.jpg` : null;
+      const screenshotPath = `screenshots/${id}.jpg`;
 
       const trade: Trade = {
         id,
@@ -96,18 +100,15 @@ export default function TradeForm() {
         exitTime: form.exitTime,
         direction: form.direction,
         result: form.result,
-        stopPoints: form.stopPoints ? Number(form.stopPoints) : 0,
-        rr: form.rr ? Number(form.rr) : form.result === "L" ? -1 : 0,
+        stopPoints: Number(form.stopPoints),
+        rr: Number(form.rr),
         screenshotPath,
         note: form.note,
         createdAt: new Date().toISOString(),
       };
 
       await addTrade(trade);
-      if (screenshotDataUrl && screenshotPath) {
-        const base64 = screenshotDataUrl.split(",")[1] ?? "";
-        await saveScreenshot(screenshotPath, base64);
-      }
+      await saveScreenshot(screenshotPath, screenshotDataUrl.split(",")[1] ?? "");
 
       setMessage({ kind: "ok", text: "Trade saved" });
       resetForm();
@@ -122,7 +123,8 @@ export default function TradeForm() {
     <form className="panel" onSubmit={handleSubmit}>
       <h2>Log a Trade</h2>
 
-      <div className="row" style={{ marginBottom: 12 }}>
+      <div className="field" style={{ marginBottom: 12 }}>
+        <label>Screenshot (required)</label>
         <ScreenshotDropzone
           previewUrl={screenshotDataUrl}
           onFile={handleFile}
@@ -146,7 +148,12 @@ export default function TradeForm() {
         </div>
         <div className="field">
           <label>Exit time</label>
-          <input type="time" value={form.exitTime} onChange={(e) => set("exitTime", e.target.value)} />
+          <input
+            type="time"
+            value={form.exitTime}
+            onChange={(e) => set("exitTime", e.target.value)}
+            required
+          />
         </div>
       </div>
 
@@ -173,11 +180,18 @@ export default function TradeForm() {
             step="0.01"
             value={form.stopPoints}
             onChange={(e) => set("stopPoints", e.target.value)}
+            required
           />
         </div>
         <div className="field">
           <label>RR</label>
-          <input type="number" step="0.01" value={form.rr} onChange={(e) => set("rr", e.target.value)} />
+          <input
+            type="number"
+            step="0.01"
+            value={form.rr}
+            onChange={(e) => set("rr", e.target.value)}
+            required
+          />
         </div>
       </div>
 

@@ -10,6 +10,7 @@ export interface MonthSummary {
   tradesPerWeek: number;
   avgEntryHour: string;
   avgExitHour: string;
+  avgTradeDuration: string;
   winningDays: number;
   losingDays: number;
   flatDays: number;
@@ -62,6 +63,22 @@ export function dailyR(trades: Trade[]): Map<string, number> {
     map.set(t.date, (map.get(t.date) ?? 0) + t.rr);
   }
   return map;
+}
+
+/** Average entry->exit duration as H:MM. Exits before entry are treated as crossing midnight. */
+function avgDuration(trades: Trade[]): string {
+  const durations = trades
+    .filter((t) => t.entryTime && t.exitTime)
+    .map((t) => {
+      const [eh, em] = t.entryTime.split(":").map(Number);
+      const [xh, xm] = t.exitTime.split(":").map(Number);
+      let mins = xh * 60 + xm - (eh * 60 + em);
+      if (mins < 0) mins += 24 * 60;
+      return mins;
+    });
+  if (durations.length === 0) return "--:--";
+  const avg = Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
+  return `${Math.floor(avg / 60)}:${(avg % 60).toString().padStart(2, "0")}`;
 }
 
 function avgTimeOfDay(times: string[]): string {
@@ -128,6 +145,7 @@ export function summarize(trades: Trade[]): MonthSummary {
     tradesPerWeek,
     avgEntryHour: avgTimeOfDay(trades.map((t) => t.entryTime).filter(Boolean)),
     avgExitHour: avgTimeOfDay(trades.map((t) => t.exitTime).filter(Boolean)),
+    avgTradeDuration: avgDuration(trades),
     winningDays,
     losingDays,
     flatDays,
@@ -138,7 +156,7 @@ function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Build a 4-6 row calendar grid (Mon-Fri columns) for the given month. */
+/** Build a calendar grid of full Mon-Sun weeks covering every day of the month. */
 export function buildCalendarWeeks(year: number, month: number): string[][] {
   const lastDay = new Date(year, month, 0);
   const firstDay = new Date(year, month - 1, 1);
@@ -148,17 +166,15 @@ export function buildCalendarWeeks(year: number, month: number): string[][] {
   const cursor = new Date(year, month - 1, 1 + mondayOffset);
 
   const weeks: string[][] = [];
-  for (let w = 0; w < 6; w++) {
+  while (cursor.getTime() <= lastDay.getTime()) {
     const week: string[] = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 7; i++) {
       const inMonth =
         cursor.getMonth() === month - 1 && cursor.getFullYear() === year;
       week.push(inMonth ? formatDate(cursor) : "");
       cursor.setDate(cursor.getDate() + 1);
     }
     weeks.push(week);
-    cursor.setDate(cursor.getDate() + 2); // Sat + Sun -> next Monday
-    if (cursor.getTime() > lastDay.getTime()) break;
   }
   return weeks;
 }
