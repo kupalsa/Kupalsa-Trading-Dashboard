@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useData } from "../lib/DataContext";
+import LiveSessionPanel from "../components/LiveSessionPanel";
 import TradeForm from "../components/TradeForm";
 import TradeTable from "../components/TradeTable";
 import DailyReviewPanel from "../components/DailyReviewPanel";
@@ -23,6 +24,7 @@ export default function LogPage() {
     <div>
       <h1 style={{ marginBottom: 16 }}>Trade Log</h1>
       {error && <p className="error-text">{error}</p>}
+      <LiveSessionPanel />
       <TradeForm />
       <DailyReviewPanel />
       <div className="panel">

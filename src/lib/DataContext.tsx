@@ -9,7 +9,7 @@ import {
 } from "react";
 import { loadSettings, saveSettings, isGithubConfigured, type AppSettings } from "./settings";
 import { readJSON, writeBinary, writeJSON } from "./githubStore";
-import { emptyRulesDoc, type DailyReview, type RulesDoc, type Trade } from "./types";
+import { emptyRulesDoc, normalizeRules, type DailyReview, type RulesDoc, type Trade } from "./types";
 import type { Opportunity } from "./backtest";
 
 interface DataContextValue {
@@ -68,12 +68,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const [t, r, rl, ops] = await Promise.all([
         readJSON<Trade[]>(settings, TRADES_PATH, []),
         readJSON<DailyReview[]>(settings, REVIEWS_PATH, []),
-        readJSON<RulesDoc>(settings, RULES_PATH, emptyRulesDoc),
+        readJSON<Partial<RulesDoc>>(settings, RULES_PATH, emptyRulesDoc),
         readJSON<Opportunity[]>(settings, OPPORTUNITIES_PATH, []),
       ]);
       setTrades(t);
       setDailyReviews(r);
-      setRules(rl);
+      setRules(normalizeRules(rl));
       setOpportunities(ops);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

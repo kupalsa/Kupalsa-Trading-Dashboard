@@ -507,6 +507,131 @@ textarea {
   accent-color: var(--accent);
 }
 
+/* --- Live session panel --- */
+
+.live-panel {
+  --live: var(--text-dim);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--live);
+  border-radius: 4px;
+  padding: 13px 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.live-panel.phase-pre { --live: var(--amber); }
+.live-panel.phase-live { --live: var(--green); background: var(--tint-green); }
+.live-panel.phase-holding { --live: var(--accent); }
+
+.live-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--live);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--live);
+}
+
+.phase-live .live-dot {
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--live); }
+  50% { opacity: 0.65; box-shadow: 0 0 0 5px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phase-live .live-dot { animation: none; }
+}
+
+.live-window {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-countdown {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-countdown strong {
+  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 14px;
+}
+
+.live-states {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 10px;
+  background: var(--bg-panel);
+}
+
+.live-states button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 5px 12px;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.live-states button.active {
+  background: var(--live);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+
+.live-states button.active:hover { color: var(--accent-ink); }
+
+.live-enable {
+  margin-top: 10px;
+  font-size: 12px;
+  padding: 4px 11px;
+}
+
+.live-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 11px;
+  padding: 9px 12px;
+  border: 1px solid var(--live);
+  border-radius: 3px;
+  background: var(--bg-panel);
+}
+
+.active-chip {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+}
+
 /* --- Session reminder --- */
 
 .modal-backdrop {
