@@ -118,3 +118,28 @@ export const PHASE_LABEL: Record<SessionPhase, string> = {
   holding: "Holding",
   closed: "Closed",
 };
+
+/**
+ * Visual weight of the live panel.
+ *
+ * An entered trade stays "active" past the entry window — the position is
+ * still running to the flat, so it remains the thing that matters. Everything
+ * else goes quiet once the window shuts.
+ */
+export type LiveTone = "active" | "pre" | "idle";
+
+export function liveTone(phase: SessionPhase, tradeState: "pending" | "entered" | "none"): LiveTone {
+  if (tradeState === "none") return "idle";
+  if (tradeState === "entered") return phase === "off" ? "idle" : "active";
+  if (phase === "live") return "active";
+  if (phase === "pre") return "pre";
+  return "idle";
+}
+
+/** Has the entry window for the given date already closed? */
+export function sessionConcluded(dateStr: string, now: Date, s: SessionSchedule): boolean {
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (dateStr < today) return true;
+  if (dateStr > today) return false;
+  return minutesNow(now) >= toMinutes(s.entryWindowClose);
+}

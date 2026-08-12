@@ -225,6 +225,34 @@ a {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* An unlogged session should be impossible to walk past. */
+.panel.needs-log {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px var(--amber), 0 0 18px -4px var(--amber);
+  animation: needs-log-glow 2.6s ease-in-out infinite;
+}
+
+.panel.needs-log h2 {
+  color: var(--amber);
+}
+
+.needs-log-badge {
+  background: var(--amber);
+  color: var(--accent-ink);
+  border-radius: 2px;
+  padding: 2px 7px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+@keyframes needs-log-glow {
+  0%, 100% { box-shadow: 0 0 0 1px var(--amber), 0 0 14px -6px var(--amber); }
+  50% { box-shadow: 0 0 0 1px var(--amber), 0 0 22px -2px var(--amber); }
 }
 
 .row {
@@ -520,9 +548,12 @@ textarea {
   box-shadow: var(--shadow);
 }
 
-.live-panel.phase-pre { --live: var(--amber); }
-.live-panel.phase-live { --live: var(--green); background: var(--tint-green); }
-.live-panel.phase-holding { --live: var(--accent); }
+/* Tone reflects what deserves attention: an entered trade stays lit past the
+   entry window, everything else fades once the window shuts. */
+.live-panel.tone-pre { --live: var(--amber); }
+.live-panel.tone-active { --live: var(--green); background: var(--tint-green); }
+.live-panel.tone-idle { --live: var(--border); opacity: 0.72; }
+.live-panel.tone-idle .live-status { color: var(--text-dim); }
 
 .live-head {
   display: flex;
@@ -550,7 +581,7 @@ textarea {
   background: var(--live);
 }
 
-.phase-live .live-dot {
+.tone-active .live-dot {
   animation: live-pulse 1.8s ease-in-out infinite;
 }
 
@@ -560,7 +591,15 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .phase-live .live-dot { animation: none; }
+  .tone-active .live-dot { animation: none; }
+  .panel.needs-log { animation: none; }
+}
+
+.live-sub {
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin-left: 2px;
 }
 
 .live-window {

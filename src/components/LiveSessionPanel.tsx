@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useData } from "../lib/DataContext";
 import {
   formatCountdown,
+  isTradingDay,
+  liveTone,
   nextMilestone,
   PHASE_LABEL,
   sessionPhase,
@@ -147,15 +149,28 @@ export default function LiveSessionPanel() {
     persist({ ...day, tradeState: state });
   }
 
-  const isLive = phase === "live";
   const countdown = milestone ? formatCountdown(milestone.at.getTime() - now.getTime()) : null;
+  const tone = liveTone(phase, day.tradeState);
+
+  // The state is switchable all day: entries get forgotten and marked later.
+  const showStates = isTradingDay(now, schedule);
+
+  const statusLabel =
+    day.tradeState === "entered"
+      ? "Trade entered"
+      : day.tradeState === "none"
+        ? "No trade"
+        : PHASE_LABEL[phase];
 
   return (
-    <div className={`live-panel phase-${phase}`}>
+    <div className={`live-panel tone-${tone}`}>
       <div className="live-head">
         <span className="live-status">
           <span className="live-dot" />
-          {PHASE_LABEL[phase]}
+          {statusLabel}
+          {day.tradeState !== "pending" && phase === "live" && (
+            <span className="live-sub">· session live</span>
+          )}
         </span>
         <span className="live-window">
           {schedule.sessionStart}–{schedule.entryWindowClose}
@@ -174,7 +189,7 @@ export default function LiveSessionPanel() {
         </div>
       )}
 
-      {(isLive || phase === "holding") && (
+      {showStates && (
         <div className="live-states">
           {(["pending", "entered", "none"] as TradeState[]).map((s) => (
             <button

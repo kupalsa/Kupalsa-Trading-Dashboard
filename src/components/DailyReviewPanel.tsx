@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
+import { sessionConcluded } from "../lib/session";
 import {
   emptyChecklist,
   ENTRY_STATES,
@@ -26,7 +27,7 @@ const CHECKLIST_LABELS: Record<keyof DailyReviewChecklist, string> = {
 };
 
 export default function DailyReviewPanel() {
-  const { dailyReviews, trades, saveDailyReview } = useData();
+  const { dailyReviews, trades, rules, saveDailyReview } = useData();
   const [date, setDate] = useState(todayStr());
   const [sessionOutcome, setSessionOutcome] = useState<SessionOutcome | "">("");
   const [entryState, setEntryState] = useState<EntryState | "">("");
@@ -49,6 +50,11 @@ export default function DailyReviewPanel() {
 
   const adherent = isAdherent({ date, sessionOutcome, entryState, checklist, notes });
 
+  // Flag an unlogged session, but only once its entry window has shut —
+  // glowing all morning about a session that hasn't happened is just noise.
+  const alreadySaved = dailyReviews.some((r) => r.date === date);
+  const needsLog = !alreadySaved && sessionConcluded(date, new Date(), rules.schedule);
+
   function toggle(key: keyof DailyReviewChecklist) {
     setChecklist((c) => ({ ...c, [key]: !c[key] }));
   }
@@ -64,8 +70,11 @@ export default function DailyReviewPanel() {
   }
 
   return (
-    <div className="panel">
-      <h2>End of Day Review</h2>
+    <div className={needsLog ? "panel needs-log" : "panel"}>
+      <h2>
+        End of Day Review
+        {needsLog && <span className="needs-log-badge">Not logged</span>}
+      </h2>
 
       <div className="row" style={{ marginBottom: 12 }}>
         <div className="field" style={{ maxWidth: 180 }}>
