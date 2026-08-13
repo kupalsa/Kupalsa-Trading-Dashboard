@@ -665,6 +665,19 @@ textarea {
   background: var(--bg-panel);
 }
 
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
 .active-chip {
   background: var(--accent) !important;
   border-color: var(--accent) !important;

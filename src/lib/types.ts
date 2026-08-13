@@ -27,8 +27,15 @@ export const SESSION_OUTCOMES = [
 ] as const;
 export type SessionOutcome = (typeof SESSION_OUTCOMES)[number];
 
-export const ENTRY_STATES = ["Calm", "Focused", "FOMO", "Hesitation", "Forcing", "Distracted"] as const;
-export type EntryState = (typeof ENTRY_STATES)[number];
+export const SESSION_STATES = [
+  "Calm",
+  "Focused",
+  "FOMO",
+  "Hesitation",
+  "Forcing",
+  "Distracted",
+] as const;
+export type SessionState = (typeof SESSION_STATES)[number];
 
 export interface DailyReviewChecklist {
   backtestValid: boolean;
@@ -53,9 +60,25 @@ export const emptyChecklist: DailyReviewChecklist = {
 export interface DailyReview {
   date: string; // YYYY-MM-DD
   sessionOutcome: SessionOutcome | "";
-  entryState: EntryState | "";
+  states: SessionState[]; // how the session felt — several can apply at once
   checklist: DailyReviewChecklist;
   notes: string;
+}
+
+/** Older reviews stored a single `entryState`; fold it into the array. */
+export function normalizeDailyReview(raw: Partial<DailyReview> & { entryState?: string }): DailyReview {
+  const legacy = raw.entryState;
+  const states =
+    raw.states ??
+    (legacy && SESSION_STATES.includes(legacy as SessionState) ? [legacy as SessionState] : []);
+
+  return {
+    date: raw.date ?? "",
+    sessionOutcome: raw.sessionOutcome ?? "",
+    states,
+    checklist: { ...emptyChecklist, ...(raw.checklist ?? {}) },
+    notes: raw.notes ?? "",
+  };
 }
 
 export function isAdherent(review: DailyReview): boolean {

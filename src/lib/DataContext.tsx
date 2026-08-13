@@ -9,7 +9,14 @@ import {
 } from "react";
 import { loadSettings, saveSettings, isGithubConfigured, type AppSettings } from "./settings";
 import { readJSON, writeBinary, writeJSON } from "./githubStore";
-import { emptyRulesDoc, normalizeRules, type DailyReview, type RulesDoc, type Trade } from "./types";
+import {
+  emptyRulesDoc,
+  normalizeDailyReview,
+  normalizeRules,
+  type DailyReview,
+  type RulesDoc,
+  type Trade,
+} from "./types";
 import type { Opportunity } from "./backtest";
 
 interface DataContextValue {
@@ -72,7 +79,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         readJSON<Opportunity[]>(settings, OPPORTUNITIES_PATH, []),
       ]);
       setTrades(t);
-      setDailyReviews(r);
+      setDailyReviews(r.map(normalizeDailyReview));
       setRules(normalizeRules(rl));
       setOpportunities(ops);
     } catch (e) {

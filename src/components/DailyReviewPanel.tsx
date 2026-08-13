@@ -3,12 +3,12 @@ import { useData } from "../lib/DataContext";
 import { sessionConcluded } from "../lib/session";
 import {
   emptyChecklist,
-  ENTRY_STATES,
   isAdherent,
   SESSION_OUTCOMES,
+  SESSION_STATES,
   type DailyReviewChecklist,
-  type EntryState,
   type SessionOutcome,
+  type SessionState,
 } from "../lib/types";
 
 function todayStr(): string {
@@ -30,7 +30,7 @@ export default function DailyReviewPanel() {
   const { dailyReviews, trades, rules, saveDailyReview } = useData();
   const [date, setDate] = useState(todayStr());
   const [sessionOutcome, setSessionOutcome] = useState<SessionOutcome | "">("");
-  const [entryState, setEntryState] = useState<EntryState | "">("");
+  const [states, setStates] = useState<SessionState[]>([]);
   const [checklist, setChecklist] = useState<DailyReviewChecklist>(emptyChecklist);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -39,7 +39,7 @@ export default function DailyReviewPanel() {
   useEffect(() => {
     const existing = dailyReviews.find((r) => r.date === date);
     setSessionOutcome(existing?.sessionOutcome ?? "");
-    setEntryState(existing?.entryState ?? "");
+    setStates(existing?.states ?? []);
     setChecklist(existing?.checklist ?? emptyChecklist);
     setNotes(existing?.notes ?? "");
     setSaved(false);
@@ -48,7 +48,7 @@ export default function DailyReviewPanel() {
   const dayTrades = useMemo(() => trades.filter((t) => t.date === date), [trades, date]);
   const totalR = useMemo(() => dayTrades.reduce((sum, t) => sum + t.rr, 0), [dayTrades]);
 
-  const adherent = isAdherent({ date, sessionOutcome, entryState, checklist, notes });
+  const adherent = isAdherent({ date, sessionOutcome, states, checklist, notes });
 
   // Flag an unlogged session, but only once its entry window has shut —
   // glowing all morning about a session that hasn't happened is just noise.
@@ -59,10 +59,20 @@ export default function DailyReviewPanel() {
     setChecklist((c) => ({ ...c, [key]: !c[key] }));
   }
 
+  function toggleState(s: SessionState) {
+    setStates((prev) =>
+      prev.includes(s)
+        ? prev.filter((x) => x !== s)
+        : // keep the canonical order rather than click order
+          SESSION_STATES.filter((x) => x === s || prev.includes(x)),
+    );
+    setSaved(false);
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
-      await saveDailyReview({ date, sessionOutcome, entryState, checklist, notes });
+      await saveDailyReview({ date, sessionOutcome, states, checklist, notes });
       setSaved(true);
     } finally {
       setSaving(false);
@@ -107,16 +117,22 @@ export default function DailyReviewPanel() {
             ))}
           </select>
         </div>
-        <div className="field">
-          <label>Entry State</label>
-          <select value={entryState} onChange={(e) => setEntryState(e.target.value as EntryState)}>
-            <option value="">—</option>
-            {ENTRY_STATES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+      </div>
+
+      <div className="field" style={{ marginBottom: 12 }}>
+        <label>State during session</label>
+        <div className="chip-group">
+          {SESSION_STATES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={states.includes(s) ? "chip active-chip" : "chip"}
+              aria-pressed={states.includes(s)}
+              onClick={() => toggleState(s)}
+            >
+              {s}
+            </button>
+          ))}
         </div>
       </div>
 
