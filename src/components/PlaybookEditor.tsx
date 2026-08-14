@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useData } from "../lib/DataContext";
 import { compressImage, dataUrlToBase64 } from "../lib/image";
-import { screenshotUrl } from "../lib/githubStore";
 import { newPlaybookStep, playbookImagePath, type PlaybookStep } from "../lib/strategy";
 import ScreenshotDropzone from "./ScreenshotDropzone";
+import { useRepoImage } from "./RepoImage";
 
 interface Props {
   strategyId: string;
@@ -11,10 +11,85 @@ interface Props {
   onChange: (steps: PlaybookStep[]) => void;
 }
 
+interface StepProps {
+  step: PlaybookStep;
+  index: number;
+  total: number;
+  /** Shown instead of the stored image until the strategy is saved. */
+  pendingUrl: string | null;
+  busy: boolean;
+  onUpdate: (patch: Partial<PlaybookStep>) => void;
+  onMove: (delta: number) => void;
+  onDelete: () => void;
+  onFile: (file: File) => void;
+  onClearImage: () => void;
+}
+
+function PlaybookStepRow({
+  step,
+  index,
+  total,
+  pendingUrl,
+  busy,
+  onUpdate,
+  onMove,
+  onDelete,
+  onFile,
+  onClearImage,
+}: StepProps) {
+  const stored = useRepoImage(pendingUrl ? null : step.imagePath);
+  const preview = pendingUrl ?? stored.url;
+
+  return (
+    <div className="playbook-step">
+      <div className="playbook-step-head">
+        <span className="playbook-num">{index + 1}</span>
+        <input
+          value={step.heading}
+          onChange={(e) => onUpdate({ heading: e.target.value })}
+          placeholder="Step heading"
+          className="playbook-heading"
+        />
+        <div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>
+          <button onClick={() => onMove(-1)} disabled={index === 0} title="Move up">
+            ↑
+          </button>
+          <button onClick={() => onMove(1)} disabled={index === total - 1} title="Move down">
+            ↓
+          </button>
+          <button onClick={onDelete} title="Delete step">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      {stored.loading && <p className="small-note">Loading image…</p>}
+
+      {preview ? (
+        <div className="playbook-image-wrap">
+          <img src={preview} alt={step.heading || `Step ${index + 1}`} className="playbook-image" />
+          <button className="playbook-replace" onClick={onClearImage}>
+            Replace image
+          </button>
+        </div>
+      ) : (
+        !stored.loading && (
+          <ScreenshotDropzone previewUrl={null} onFile={onFile} onClear={() => {}} busy={busy} />
+        )
+      )}
+
+      <textarea
+        value={step.description}
+        onChange={(e) => onUpdate({ description: e.target.value })}
+        placeholder="What happens at this step, and what you are looking for…"
+        style={{ marginTop: 10, minHeight: 90 }}
+      />
+    </div>
+  );
+}
+
 export default function PlaybookEditor({ strategyId, steps, onChange }: Props) {
-  const { savePlaybookImage, settings } = useData();
-  // Images live in the repo, but a freshly pasted one is shown from memory
-  // until the strategy is saved.
+  const { savePlaybookImage } = useData();
   const [pending, setPending] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -44,6 +119,15 @@ export default function PlaybookEditor({ strategyId, steps, onChange }: Props) {
     }
   }
 
+  function clearImage(step: PlaybookStep) {
+    setPending((p) => {
+      const next = { ...p };
+      delete next[step.id];
+      return next;
+    });
+    update(step.id, { imagePath: null });
+  }
+
   return (
     <div>
       <p className="small-note" style={{ marginTop: 0 }}>
@@ -53,68 +137,21 @@ export default function PlaybookEditor({ strategyId, steps, onChange }: Props) {
 
       {steps.length === 0 && <p className="muted">No steps yet.</p>}
 
-      {steps.map((step, i) => {
-        const preview = pending[step.id] ?? (step.imagePath ? screenshotUrl(settings, step.imagePath) : null);
-        return (
-          <div className="playbook-step" key={step.id}>
-            <div className="playbook-step-head">
-              <span className="playbook-num">{i + 1}</span>
-              <input
-                value={step.heading}
-                onChange={(e) => update(step.id, { heading: e.target.value })}
-                placeholder="Step heading"
-                className="playbook-heading"
-              />
-              <div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>
-                <button onClick={() => move(i, -1)} disabled={i === 0} title="Move up">
-                  ↑
-                </button>
-                <button onClick={() => move(i, 1)} disabled={i === steps.length - 1} title="Move down">
-                  ↓
-                </button>
-                <button
-                  onClick={() => onChange(steps.filter((s) => s.id !== step.id))}
-                  title="Delete step"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {preview ? (
-              <div className="playbook-image-wrap">
-                <img src={preview} alt={step.heading || `Step ${i + 1}`} className="playbook-image" />
-                <button
-                  className="playbook-replace"
-                  onClick={() => {
-                    setPending((p) => {
-                      const { [step.id]: _drop, ...rest } = p;
-                      return rest;
-                    });
-                    update(step.id, { imagePath: null });
-                  }}
-                >
-                  Replace image
-                </button>
-              </div>
-            ) : (
-              <ScreenshotDropzone
-                previewUrl={null}
-                onFile={(f) => handleImage(step, f)}
-                onClear={() => {}}
-                busy={busy === step.id}
-              />
-            )}
-
-            <textarea
-              value={step.description}
-              onChange={(e) => update(step.id, { description: e.target.value })}
-              placeholder="What happens at this step, and what you are looking for…"
-              style={{ marginTop: 10, minHeight: 90 }}
-            />
-          </div>
-        );
-      })}
+      {steps.map((step, i) => (
+        <PlaybookStepRow
+          key={step.id}
+          step={step}
+          index={i}
+          total={steps.length}
+          pendingUrl={pending[step.id] ?? null}
+          busy={busy === step.id}
+          onUpdate={(patch) => update(step.id, patch)}
+          onMove={(d) => move(i, d)}
+          onDelete={() => onChange(steps.filter((s) => s.id !== step.id))}
+          onFile={(f) => handleImage(step, f)}
+          onClearImage={() => clearImage(step)}
+        />
+      ))}
 
       <button onClick={() => onChange([...steps, newPlaybookStep()])}>+ Add step</button>
     </div>

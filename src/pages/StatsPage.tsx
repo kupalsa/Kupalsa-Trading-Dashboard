@@ -41,6 +41,7 @@ export default function StatsPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [fitMode, setFitMode] = useState(true);
+  const [showAdherence, setShowAdherence] = useState(false);
   const { zoom, setZoom, fit } = useUiZoom();
 
   const monthTrades = useMemo(() => tradesForMonth(trades, year, month), [trades, year, month]);
@@ -119,8 +120,24 @@ export default function StatsPage() {
 
       <div className="stats-body">
         <div className="panel">
-          <h2>Daily R</h2>
-          <MonthCalendar year={year} month={month} trades={monthTrades} />
+          <h2>
+            Daily R
+            <label className="bool-field" style={{ paddingBottom: 0, marginLeft: "auto", fontWeight: 400 }}>
+              <input
+                type="checkbox"
+                checked={showAdherence}
+                onChange={(e) => setShowAdherence(e.target.checked)}
+              />
+              Adherence
+            </label>
+          </h2>
+          <MonthCalendar
+            year={year}
+            month={month}
+            trades={monthTrades}
+            reviews={monthReviews}
+            showAdherence={showAdherence}
+          />
         </div>
 
         <div className="stats-side">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import { sessionConcluded } from "../lib/session";
+import ReviewMiniCalendar from "./ReviewMiniCalendar";
 import type { Strategy } from "../lib/strategy";
 import {
   emptyChecklist,
@@ -37,6 +38,7 @@ export default function DailyReviewPanel({ strategy }: { strategy: Strategy }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const history = useMemo(
     () =>
@@ -102,7 +104,15 @@ export default function DailyReviewPanel({ strategy }: { strategy: Strategy }) {
       <div className="row" style={{ marginBottom: 12 }}>
         <div className="field" style={{ maxWidth: 180 }}>
           <label>Date</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input
+            type="date"
+            className={alreadySaved ? "date-logged" : "date-unlogged"}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+          <span className={alreadySaved ? "success-text" : "warn-text"}>
+            {alreadySaved ? "Logged" : "Not logged"}
+          </span>
         </div>
         <div className="field">
           <label>Num of trades</label>
@@ -175,6 +185,23 @@ export default function DailyReviewPanel({ strategy }: { strategy: Strategy }) {
         </button>
         {saved && <span className="success-text">Saved</span>}
       </div>
+
+      <button
+        type="button"
+        className="history-toggle"
+        onClick={() => setCalendarOpen((o) => !o)}
+      >
+        {calendarOpen ? "▾" : "▸"} Month at a glance
+      </button>
+
+      {calendarOpen && (
+        <ReviewMiniCalendar
+          strategy={strategy}
+          reviews={dailyReviews}
+          selectedDate={date}
+          onPick={setDate}
+        />
+      )}
 
       <button
         type="button"

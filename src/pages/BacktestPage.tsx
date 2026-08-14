@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import OpportunityForm from "../components/OpportunityForm";
-import { screenshotUrl } from "../lib/githubStore";
+import { RepoImageLink } from "../components/RepoImage";
 import {
   attemptedOnly,
   derive,
@@ -60,7 +60,6 @@ export default function BacktestPage() {
     githubReady,
     loading,
     deleteOpportunity,
-    settings,
     strategies,
     selectedIds,
   } = useData();
@@ -296,15 +295,9 @@ export default function BacktestPage() {
                         {o.screenshots.length === 0
                           ? "—"
                           : o.screenshots.map((s, i) => (
-                              <a
-                                key={s.path}
-                                href={screenshotUrl(settings, s.path)}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ marginRight: 6 }}
-                              >
-                                {i + 1}
-                              </a>
+                              <span key={s.path} style={{ marginRight: 6 }}>
+                                <RepoImageLink path={s.path}>{i + 1}</RepoImageLink>
+                              </span>
                             ))}
                       </td>
                       <td style={{ whiteSpace: "nowrap" }}>

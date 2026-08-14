@@ -131,8 +131,9 @@ export type LiveTone = "active" | "pre" | "idle";
 export function liveTone(phase: SessionPhase, tradeState: "pending" | "entered" | "none"): LiveTone {
   if (tradeState === "none") return "idle";
   if (tradeState === "entered") return phase === "off" ? "idle" : "active";
-  if (phase === "live") return "active";
-  if (phase === "pre") return "pre";
+  // Pending is a waiting state, not an achievement — amber, so green is
+  // reserved for a position actually being on.
+  if (phase === "live" || phase === "pre") return "pre";
   return "idle";
 }
 

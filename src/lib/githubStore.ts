@@ -129,6 +129,41 @@ export async function testConnection(s: AppSettings): Promise<string> {
   return data.full_name as string;
 }
 
-export function screenshotUrl(s: AppSettings, path: string): string {
-  return `https://raw.githubusercontent.com/${s.githubOwner}/${s.githubRepo}/main/${path}`;
+/**
+ * Images live in a private repo, so raw.githubusercontent.com URLs 404 — the
+ * browser can't attach the token to a plain <img src>. Fetch the bytes through
+ * the API instead and hand back an object URL.
+ *
+ * Results are cached per path: the same screenshot is often rendered in a list
+ * and then again in an editor, and blobs are cheap to keep but wasteful to
+ * refetch.
+ */
+const imageCache = new Map<string, Promise<string>>();
+
+export function fetchRepoImage(s: AppSettings, path: string): Promise<string> {
+  const key = `${s.githubOwner}/${s.githubRepo}/${path}`;
+  const hit = imageCache.get(key);
+  if (hit) return hit;
+
+  const load = (async () => {
+    const res = await fetch(`${apiBase(s)}/${path}`, {
+      headers: { ...headers(s), Accept: "application/vnd.github.raw" },
+    });
+    if (!res.ok) {
+      throw new GithubApiError(
+        `Could not load image ${path} (${res.status})`,
+        res.status,
+      );
+    }
+    return URL.createObjectURL(await res.blob());
+  })();
+
+  // A failed load shouldn't be cached forever — let the next render retry.
+  load.catch(() => imageCache.delete(key));
+  imageCache.set(key, load);
+  return load;
+}
+
+export function forgetRepoImage(s: AppSettings, path: string): void {
+  imageCache.delete(`${s.githubOwner}/${s.githubRepo}/${path}`);
 }

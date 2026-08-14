@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useData } from "../lib/DataContext";
-import { screenshotUrl } from "../lib/githubStore";
 import type { Trade } from "../lib/types";
 import TradeForm from "./TradeForm";
+import { RepoImageLink } from "./RepoImage";
 
 function resultPillClass(result: string): string {
   if (result === "W") return "pill win";
@@ -11,7 +11,7 @@ function resultPillClass(result: string): string {
 }
 
 export default function TradeTable({ strategyIds }: { strategyIds?: string[] }) {
-  const { trades, deleteTrade, settings, strategies } = useData();
+  const { trades, deleteTrade, strategies } = useData();
   const scoped = strategyIds ? trades.filter((t) => strategyIds.includes(t.strategyId)) : trades;
   const sorted = [...scoped].sort(
     (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
@@ -66,9 +66,7 @@ export default function TradeTable({ strategyIds }: { strategyIds?: string[] }) 
               </td>
               <td>
                 {t.screenshotPath ? (
-                  <a href={screenshotUrl(settings, t.screenshotPath)} target="_blank" rel="noreferrer">
-                    view
-                  </a>
+                  <RepoImageLink path={t.screenshotPath}>view</RepoImageLink>
                 ) : (
                   "—"
                 )}

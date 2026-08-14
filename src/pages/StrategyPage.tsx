@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "../lib/DataContext";
 import PlaybookEditor from "../components/PlaybookEditor";
 import type { SessionSchedule } from "../lib/session";
-import type { PlaybookStep, Strategy } from "../lib/strategy";
+import { STOP_FORMATS, type PlaybookStep, type Strategy, type StrategyDefinition } from "../lib/strategy";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -20,6 +20,8 @@ export default function StrategyPage() {
   const [tab, setTab] = useState<Tab>("rules");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setDraft(strategy ?? null);
@@ -34,6 +36,11 @@ export default function StrategyPage() {
 
   function set<K extends keyof Strategy>(key: K, value: Strategy[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
+    setSaved(false);
+  }
+
+  function setDef<K extends keyof StrategyDefinition>(key: K, value: StrategyDefinition[K]) {
+    setDraft((d) => (d ? { ...d, definition: { ...d.definition, [key]: value } } : d));
     setSaved(false);
   }
 
@@ -56,9 +63,12 @@ export default function StrategyPage() {
   async function handleSave() {
     if (!draft) return;
     setSaving(true);
+    setError(null);
     try {
       await saveStrategy(draft);
       setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -66,9 +76,14 @@ export default function StrategyPage() {
 
   async function handleDelete() {
     if (!draft) return;
-    if (!window.confirm(`Delete strategy "${draft.name}"? Its logged trades are kept.`)) return;
-    await deleteStrategy(draft.id);
-    navigate("/");
+    setError(null);
+    try {
+      await deleteStrategy(draft.id);
+      navigate("/");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setConfirmDelete(false);
+    }
   }
 
   const orderIssue =
@@ -95,9 +110,28 @@ export default function StrategyPage() {
         <>
           <div className="panel">
             <h2>Identity</h2>
-            <div className="field" style={{ maxWidth: 320 }}>
-              <label>Strategy name</label>
-              <input value={draft.name} onChange={(e) => set("name", e.target.value)} />
+            <div className="row">
+              <div className="field" style={{ flex: 1, minWidth: 220 }}>
+                <label>Strategy name</label>
+                <input value={draft.name} onChange={(e) => set("name", e.target.value)} />
+              </div>
+              <div className="field" style={{ flex: 1, minWidth: 180 }}>
+                <label>Assets</label>
+                <input
+                  value={draft.definition.assets}
+                  onChange={(e) => setDef("assets", e.target.value)}
+                  placeholder="MGC"
+                />
+              </div>
+            </div>
+            <div className="field" style={{ marginTop: 10 }}>
+              <label>Strategy pattern</label>
+              <textarea
+                value={draft.definition.strategyPattern}
+                onChange={(e) => setDef("strategyPattern", e.target.value)}
+                placeholder="The setup this strategy is built around…"
+                style={{ minHeight: 60 }}
+              />
             </div>
           </div>
 
@@ -168,12 +202,139 @@ export default function StrategyPage() {
           </div>
 
           <div className="panel">
-            <h2>Strategy Rules</h2>
+            <h2>Trigger</h2>
+            <div className="field" style={{ marginBottom: 10 }}>
+              <label>Trigger</label>
+              <textarea
+                value={draft.definition.trigger}
+                onChange={(e) => setDef("trigger", e.target.value)}
+                placeholder="What puts this setup on the radar…"
+                style={{ minHeight: 56 }}
+              />
+            </div>
+            <div className="field" style={{ maxWidth: 220 }}>
+              <label>Trigger time-frame</label>
+              <input
+                value={draft.definition.triggerTimeFrame}
+                onChange={(e) => setDef("triggerTimeFrame", e.target.value)}
+                placeholder="15M-4H"
+              />
+            </div>
+          </div>
+
+          <div className="panel">
+            <h2>Validation</h2>
+            <div className="field" style={{ marginBottom: 10 }}>
+              <label>Validation (entry)</label>
+              <textarea
+                value={draft.definition.validationEntry}
+                onChange={(e) => setDef("validationEntry", e.target.value)}
+                placeholder="What confirms the entry…"
+                style={{ minHeight: 56 }}
+              />
+            </div>
+            <div className="field" style={{ maxWidth: 220 }}>
+              <label>Validation time-frame</label>
+              <input
+                value={draft.definition.validationTimeFrame}
+                onChange={(e) => setDef("validationTimeFrame", e.target.value)}
+                placeholder="1M"
+              />
+            </div>
+          </div>
+
+          <div className="panel">
+            <h2>Stop</h2>
+            <div className="field" style={{ marginBottom: 10 }}>
+              <label>Stop</label>
+              <textarea
+                value={draft.definition.stop}
+                onChange={(e) => setDef("stop", e.target.value)}
+                placeholder="Where the stop goes and why…"
+                style={{ minHeight: 56 }}
+              />
+            </div>
+            <div className="row">
+              <div className="field">
+                <label>Stop format</label>
+                <select
+                  value={draft.definition.stopFormat}
+                  onChange={(e) => setDef("stopFormat", e.target.value)}
+                >
+                  {STOP_FORMATS.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Stop time-frame</label>
+                <input
+                  value={draft.definition.stopTimeFrame}
+                  onChange={(e) => setDef("stopTimeFrame", e.target.value)}
+                  placeholder="15M/1H"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="panel">
+            <h2>Take profit</h2>
+            <div className="field" style={{ marginBottom: 10 }}>
+              <label>TP</label>
+              <textarea
+                value={draft.definition.takeProfit}
+                onChange={(e) => setDef("takeProfit", e.target.value)}
+                placeholder="Where the target sits…"
+                style={{ minHeight: 56 }}
+              />
+            </div>
+            <div className="row">
+              <div className="field">
+                <label>TP time-frame</label>
+                <input
+                  value={draft.definition.tpTimeFrame}
+                  onChange={(e) => setDef("tpTimeFrame", e.target.value)}
+                  placeholder="15M/1H"
+                />
+              </div>
+              <div className="field">
+                <label>Partial TP</label>
+                <input
+                  value={draft.definition.partialTp}
+                  onChange={(e) => setDef("partialTp", e.target.value)}
+                  placeholder="None"
+                />
+              </div>
+              <div className="field">
+                <label>Minimal R target</label>
+                <input
+                  value={draft.definition.minimalRTarget}
+                  onChange={(e) => setDef("minimalRTarget", e.target.value)}
+                  placeholder="2R"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="panel">
+            <h2>Bigger picture</h2>
             <textarea
-              style={{ minHeight: 200 }}
+              value={draft.definition.biggerPicture}
+              onChange={(e) => setDef("biggerPicture", e.target.value)}
+              placeholder="Top-down analysis, higher time-frame context…"
+              style={{ minHeight: 80 }}
+            />
+          </div>
+
+          <div className="panel">
+            <h2>Additional Rules</h2>
+            <textarea
+              style={{ minHeight: 160 }}
               value={draft.strategyRules}
               onChange={(e) => set("strategyRules", e.target.value)}
-              placeholder="Trigger, validation, stop/TP rules, priorities…"
+              placeholder="Anything not covered by the fields above…"
             />
           </div>
 
@@ -204,12 +365,23 @@ export default function StrategyPage() {
             {saving ? "Saving…" : "Save strategy"}
           </button>
           {saved && <span className="success-text">Saved</span>}
+          {error && <span className="error-text">{error}</span>}
         </div>
-        {strategies.length > 1 && (
-          <button onClick={handleDelete} style={{ color: "var(--red)" }}>
-            Delete strategy
-          </button>
-        )}
+
+        {strategies.length > 1 &&
+          (confirmDelete ? (
+            <div className="row">
+              <span className="small-note">Delete &ldquo;{draft.name}&rdquo;? Logged trades are kept.</span>
+              <button onClick={handleDelete} style={{ color: "var(--red)" }}>
+                Yes, delete
+              </button>
+              <button onClick={() => setConfirmDelete(false)}>Cancel</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} style={{ color: "var(--red)" }}>
+              Delete strategy
+            </button>
+          ))}
       </div>
     </div>
   );

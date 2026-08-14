@@ -12,10 +12,51 @@ export interface PlaybookStep {
   description: string;
 }
 
+/**
+ * The strategy definition, mirroring the Strategy:Rules sheet. Every row there
+ * is a field here, grouped the way the sheet groups them.
+ */
+export interface StrategyDefinition {
+  assets: string;
+  strategyPattern: string;
+  trigger: string;
+  triggerTimeFrame: string;
+  validationEntry: string;
+  validationTimeFrame: string;
+  stop: string;
+  stopFormat: string;
+  stopTimeFrame: string;
+  takeProfit: string;
+  tpTimeFrame: string;
+  partialTp: string;
+  minimalRTarget: string;
+  biggerPicture: string;
+}
+
+export const emptyDefinition: StrategyDefinition = {
+  assets: "",
+  strategyPattern: "",
+  trigger: "",
+  triggerTimeFrame: "",
+  validationEntry: "",
+  validationTimeFrame: "",
+  stop: "",
+  stopFormat: "Pts.",
+  stopTimeFrame: "",
+  takeProfit: "",
+  tpTimeFrame: "",
+  partialTp: "",
+  minimalRTarget: "",
+  biggerPicture: "",
+};
+
+export const STOP_FORMATS = ["Pts.", "%", "$", "Ticks"] as const;
+
 export interface Strategy {
   id: string;
   name: string;
   schedule: SessionSchedule;
+  definition: StrategyDefinition;
   strategyRules: string;
   strategyNotes: string;
   playbook: PlaybookStep[];
@@ -30,6 +71,7 @@ export function newStrategy(name: string): Strategy {
     id: crypto.randomUUID(),
     name,
     schedule: { ...defaultSchedule },
+    definition: { ...emptyDefinition },
     strategyRules: "",
     strategyNotes: "",
     playbook: [],
@@ -55,6 +97,7 @@ export function normalizeStrategy(raw: Partial<Strategy>): Strategy {
     id: raw.id ?? crypto.randomUUID(),
     name: raw.name?.trim() || "Untitled strategy",
     schedule: { ...defaultSchedule, ...(raw.schedule ?? {}) },
+    definition: { ...emptyDefinition, ...(raw.definition ?? {}) },
     strategyRules: raw.strategyRules ?? "",
     strategyNotes: raw.strategyNotes ?? "",
     playbook: (raw.playbook ?? []).map(normalizeStep),

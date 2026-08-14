@@ -385,7 +385,153 @@ a {
   color: var(--amber);
 }
 
+/* Logged / unlogged state of the chosen review date. */
+input.date-logged {
+  border-color: var(--green);
+  background: var(--tint-green);
+}
+
+input.date-unlogged {
+  border-color: var(--amber);
+  background: var(--bg-panel-2);
+}
+
+.warn-text {
+  color: var(--amber);
+  font-size: 12px;
+}
+
+/* --- Review mini calendar --- */
+
+.mini-cal {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-panel-2);
+  max-width: 320px;
+}
+
+.mini-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.mini-cal-head button {
+  padding: 1px 8px;
+  box-shadow: none;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 15px;
+}
+
+.mini-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  margin-bottom: 3px;
+}
+
+.mini-cal-labels div {
+  font-size: 9px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+/* Square days, matching the main calendar. The number sits in a child so its
+   cqw sizing resolves against this cell rather than an outer container. */
+.mini-day {
+  aspect-ratio: 1 / 1;
+  container-type: inline-size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  box-shadow: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-day > span {
+  font-size: 34cqw;
+  line-height: 1;
+}
+
+.mini-day.empty {
+  border: none;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* Days this strategy doesn't trade are present but inert. */
+.mini-day.off {
+  opacity: 0.3;
+  border-style: dashed;
+}
+
+.mini-day.logged-ok {
+  background: var(--tint-green);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.mini-day.logged-bad {
+  background: var(--tint-red);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.mini-day.missing {
+  background: var(--bg-panel);
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.mini-day.today {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.mini-day.selected {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.mini-cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.mini-cal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  display: inline-block;
+}
+
+.swatch.logged-ok { background: var(--tint-green); border-color: var(--green); }
+.swatch.logged-bad { background: var(--tint-red); border-color: var(--red); }
+.swatch.missing { background: var(--bg-panel); border-color: var(--amber); }
+
 .history-toggle {
+  display: block;
   border: none;
   background: transparent;
   box-shadow: none;
@@ -393,6 +539,7 @@ a {
   margin-top: 14px;
   font-size: 12px;
   color: var(--text-dim);
+  text-align: left;
 }
 
 .history-toggle:hover {
@@ -614,6 +761,34 @@ th {
 .day-cell.win-day .r-value { color: var(--green); }
 .day-cell.loss-day { border-color: var(--red); background: var(--tint-red); }
 .day-cell.loss-day .r-value { color: var(--red); }
+
+/* Today reads as a ring so it survives whatever colour the day already has. */
+.day-cell.today {
+  box-shadow: 0 0 0 2px var(--accent);
+  border-color: var(--accent);
+}
+
+.day-cell.today .date-num {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Adherence sits on top of the R colouring as a corner mark and a left edge. */
+.day-cell.adherent { border-left: 3px solid var(--green); }
+.day-cell.not-adherent { border-left: 3px solid var(--amber); }
+
+.adherence-mark {
+  position: absolute;
+  top: 5%;
+  right: 7%;
+  font-size: 16cqw;
+  line-height: 1;
+}
+
+.adherence-mark.ok { color: var(--green); }
+.adherence-mark.bad { color: var(--amber); }
+
+.day-cell { position: relative; }
 
 /* --- Stats page fit-to-screen --- */
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useData } from "../lib/DataContext";
 import { newStrategy } from "../lib/strategy";
@@ -6,21 +7,37 @@ export default function StrategyPicker() {
   const { strategies, selectedIds, setSelectedIds, saveStrategy } = useData();
   const navigate = useNavigate();
 
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   function toggle(id: string) {
     const next = selectedIds.includes(id)
       ? selectedIds.filter((x) => x !== id)
-      : [...strategies.map((s) => s.id).filter((x) => x === id || selectedIds.includes(x))];
-    // never leave nothing selected
+      : strategies.map((s) => s.id).filter((x) => x === id || selectedIds.includes(x));
+    // Never leave nothing selected — the whole app filters on this.
     setSelectedIds(next.length > 0 ? next : [id]);
   }
 
-  async function createStrategy() {
-    const name = window.prompt("Name for the new strategy");
-    if (!name?.trim()) return;
-    const s = newStrategy(name.trim());
-    await saveStrategy(s);
-    setSelectedIds([s.id]);
-    navigate(`/strategy/${s.id}`);
+  async function createStrategy(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const s = newStrategy(trimmed);
+      await saveStrategy(s);
+      setSelectedIds([s.id]);
+      setCreating(false);
+      setName("");
+      navigate(`/strategy/${s.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -45,9 +62,51 @@ export default function StrategyPicker() {
           </button>
         </div>
       ))}
-      <button className="strategy-new" onClick={createStrategy}>
-        + New strategy
-      </button>
+
+      {creating ? (
+        <form onSubmit={createStrategy} style={{ marginTop: 6 }}>
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Strategy name"
+            style={{ width: "100%", fontSize: 12, padding: "4px 6px" }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setCreating(false);
+                setName("");
+                setError(null);
+              }
+            }}
+          />
+          <div className="row" style={{ gap: 4, marginTop: 5, flexWrap: "nowrap" }}>
+            <button type="submit" className="primary strategy-new" disabled={busy || !name.trim()}>
+              {busy ? "Creating…" : "Create"}
+            </button>
+            <button
+              type="button"
+              className="strategy-new"
+              onClick={() => {
+                setCreating(false);
+                setName("");
+                setError(null);
+              }}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+          </div>
+          {error && (
+            <div className="error-text" style={{ marginTop: 5 }}>
+              {error}
+            </div>
+          )}
+        </form>
+      ) : (
+        <button className="strategy-new" onClick={() => setCreating(true)}>
+          + New strategy
+        </button>
+      )}
     </div>
   );
 }
