@@ -7,9 +7,12 @@ function resultPillClass(result: string): string {
   return "pill be";
 }
 
-export default function TradeTable() {
+export default function TradeTable({ strategyIds }: { strategyIds?: string[] }) {
   const { trades, deleteTrade, settings } = useData();
-  const sorted = [...trades].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  const scoped = strategyIds ? trades.filter((t) => strategyIds.includes(t.strategyId)) : trades;
+  const sorted = [...scoped].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
+  );
 
   if (sorted.length === 0) {
     return <p className="muted">No trades logged yet.</p>;

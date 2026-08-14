@@ -3,9 +3,10 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import { DataProvider, useData } from "./lib/DataContext";
 import { applyTheme, loadTheme, type Theme } from "./lib/theme";
 import SessionReminder from "./components/SessionReminder";
+import StrategyPicker from "./components/StrategyPicker";
 import LogPage from "./pages/LogPage";
 import StatsPage from "./pages/StatsPage";
-import RulesPage from "./pages/RulesPage";
+import StrategyPage from "./pages/StrategyPage";
 import BacktestPage from "./pages/BacktestPage";
 import SettingsPage from "./pages/SettingsPage";
 
@@ -20,11 +21,12 @@ function Sidebar() {
   return (
     <nav className="sidebar">
       <h1>Trading Journal</h1>
+      <StrategyPicker />
       <NavLink to="/" end>
         Log
       </NavLink>
       <NavLink to="/stats">Stats</NavLink>
-      <NavLink to="/rules">Rules &amp; Notes</NavLink>
+      <NavLink to="/strategy">Strategy</NavLink>
       <NavLink to="/backtest">Backtest</NavLink>
       <NavLink to="/settings">
         Settings {!githubReady && <span style={{ color: "var(--amber)" }}>●</span>}
@@ -50,7 +52,8 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<LogPage />} />
           <Route path="/stats" element={<StatsPage />} />
-          <Route path="/rules" element={<RulesPage />} />
+          <Route path="/strategy" element={<StrategyPage />} />
+          <Route path="/strategy/:id" element={<StrategyPage />} />
           <Route path="/backtest" element={<BacktestPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>

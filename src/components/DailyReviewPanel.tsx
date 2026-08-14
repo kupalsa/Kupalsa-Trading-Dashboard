@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import { sessionConcluded } from "../lib/session";
+import type { Strategy } from "../lib/strategy";
 import {
   emptyChecklist,
   isAdherent,
@@ -26,8 +27,8 @@ const CHECKLIST_LABELS: Record<keyof DailyReviewChecklist, string> = {
   structureValid: "Structure Valid",
 };
 
-export default function DailyReviewPanel() {
-  const { dailyReviews, trades, rules, saveDailyReview } = useData();
+export default function DailyReviewPanel({ strategy }: { strategy: Strategy }) {
+  const { dailyReviews, trades, saveDailyReview } = useData();
   const [date, setDate] = useState(todayStr());
   const [sessionOutcome, setSessionOutcome] = useState<SessionOutcome | "">("");
   const [states, setStates] = useState<SessionState[]>([]);
@@ -37,23 +38,26 @@ export default function DailyReviewPanel() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const existing = dailyReviews.find((r) => r.date === date);
+    const existing = dailyReviews.find((r) => r.date === date && r.strategyId === strategy.id);
     setSessionOutcome(existing?.sessionOutcome ?? "");
     setStates(existing?.states ?? []);
     setChecklist(existing?.checklist ?? emptyChecklist);
     setNotes(existing?.notes ?? "");
     setSaved(false);
-  }, [date, dailyReviews]);
+  }, [date, dailyReviews, strategy.id]);
 
-  const dayTrades = useMemo(() => trades.filter((t) => t.date === date), [trades, date]);
+  const dayTrades = useMemo(
+    () => trades.filter((t) => t.date === date && t.strategyId === strategy.id),
+    [trades, date, strategy.id],
+  );
   const totalR = useMemo(() => dayTrades.reduce((sum, t) => sum + t.rr, 0), [dayTrades]);
 
-  const adherent = isAdherent({ date, sessionOutcome, states, checklist, notes });
+  const adherent = isAdherent({ strategyId: strategy.id, date, sessionOutcome, states, checklist, notes });
 
   // Flag an unlogged session, but only once its entry window has shut —
   // glowing all morning about a session that hasn't happened is just noise.
-  const alreadySaved = dailyReviews.some((r) => r.date === date);
-  const needsLog = !alreadySaved && sessionConcluded(date, new Date(), rules.schedule);
+  const alreadySaved = dailyReviews.some((r) => r.date === date && r.strategyId === strategy.id);
+  const needsLog = !alreadySaved && sessionConcluded(date, new Date(), strategy.schedule);
 
   function toggle(key: keyof DailyReviewChecklist) {
     setChecklist((c) => ({ ...c, [key]: !c[key] }));
@@ -72,7 +76,7 @@ export default function DailyReviewPanel() {
   async function handleSave() {
     setSaving(true);
     try {
-      await saveDailyReview({ date, sessionOutcome, states, checklist, notes });
+      await saveDailyReview({ strategyId: strategy.id, date, sessionOutcome, states, checklist, notes });
       setSaved(true);
     } finally {
       setSaving(false);
@@ -141,11 +145,11 @@ export default function DailyReviewPanel() {
           <div className="checkbox-row" style={{ marginBottom: 6 }} key={key}>
             <input
               type="checkbox"
-              id={key}
+              id={`${strategy.id}-${key}`}
               checked={checklist[key]}
               onChange={() => toggle(key)}
             />
-            <label htmlFor={key}>{CHECKLIST_LABELS[key]}</label>
+            <label htmlFor={`${strategy.id}-${key}`}>{CHECKLIST_LABELS[key]}</label>
           </div>
         ))}
       </div>

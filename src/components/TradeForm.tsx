@@ -6,6 +6,7 @@ import { dayOfWeek } from "../lib/stats";
 import { isAnthropicConfigured } from "../lib/settings";
 import type { Direction, Result, Trade } from "../lib/types";
 import ScreenshotDropzone from "./ScreenshotDropzone";
+import type { Strategy } from "../lib/strategy";
 
 function todayStr(): string {
   const d = new Date();
@@ -23,7 +24,14 @@ const emptyForm = {
   note: "",
 };
 
-export default function TradeForm() {
+export default function TradeForm({
+  strategy,
+  acceptPaste = true,
+}: {
+  strategy: Strategy;
+  /** With several strategies side by side, only the focused column takes a paste. */
+  acceptPaste?: boolean;
+}) {
   const { settings, addTrade, saveScreenshot } = useData();
   const [form, setForm] = useState(emptyForm);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
@@ -63,6 +71,7 @@ export default function TradeForm() {
 
   // Allow pasting a screenshot anywhere on the page, not just inside the dropzone.
   useEffect(() => {
+    if (!acceptPaste) return;
     function onPaste(e: ClipboardEvent) {
       const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith("image/"));
       const file = item?.getAsFile();
@@ -73,7 +82,7 @@ export default function TradeForm() {
     }
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [handleFile]);
+  }, [handleFile, acceptPaste]);
 
   function resetForm() {
     setForm({ ...emptyForm, date: todayStr() });
@@ -94,6 +103,7 @@ export default function TradeForm() {
 
       const trade: Trade = {
         id,
+        strategyId: strategy.id,
         date: form.date,
         day: dayOfWeek(form.date),
         entryTime: form.entryTime,

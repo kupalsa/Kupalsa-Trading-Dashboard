@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useData } from "../lib/DataContext";
 import {
   formatCountdown,
   isTradingDay,
@@ -19,6 +18,7 @@ import {
   type DayState,
   type TradeState,
 } from "../lib/liveState";
+import type { Strategy } from "../lib/strategy";
 import {
   notifyPermission,
   playSound,
@@ -32,12 +32,11 @@ interface Banner {
   body: string;
 }
 
-export default function LiveSessionPanel() {
-  const { rules } = useData();
-  const schedule = rules.schedule;
+export default function LiveSessionPanel({ strategy }: { strategy: Strategy }) {
+  const schedule = strategy.schedule;
 
   const [now, setNow] = useState(() => new Date());
-  const [day, setDay] = useState<DayState>(() => loadDayState());
+  const [day, setDay] = useState<DayState>(() => loadDayState(strategy.id));
   const [banner, setBanner] = useState<Banner | null>(null);
   const [perm, setPerm] = useState<NotifyPermission>(() => notifyPermission());
 
@@ -50,10 +49,13 @@ export default function LiveSessionPanel() {
     return () => clearInterval(id);
   }, []);
 
-  const persist = useCallback((next: DayState) => {
-    setDay(next);
-    saveDayState(next);
-  }, []);
+  const persist = useCallback(
+    (next: DayState) => {
+      setDay(next);
+      saveDayState(strategy.id, next);
+    },
+    [strategy.id],
+  );
 
   const fire = useCallback(
     (kind: AlertKind, title: string, body: string, sound: "chime" | "alarm") => {
@@ -63,11 +65,11 @@ export default function LiveSessionPanel() {
       playSound(sound);
       setDay((prev) => {
         const next = { ...prev, fired: [...new Set([...prev.fired, kind])] };
-        saveDayState(next);
+        saveDayState(strategy.id, next);
         return next;
       });
     },
-    [],
+    [strategy.id],
   );
 
   const phase: SessionPhase = sessionPhase(now, schedule);
@@ -76,11 +78,11 @@ export default function LiveSessionPanel() {
   // Roll over to a fresh day state at midnight.
   useEffect(() => {
     if (day.date !== todayStr(now)) {
-      const fresh = loadDayState(now);
+      const fresh = loadDayState(strategy.id, now);
       handled.current = new Set(fresh.fired);
       persist(fresh);
     }
-  }, [now, day.date, persist]);
+  }, [now, day.date, persist, strategy.id]);
 
   // Alert scheduler. On mount, anything already past is marked handled without
   // notifying, so opening the dashboard late doesn't replay stale alerts.
@@ -109,21 +111,21 @@ export default function LiveSessionPanel() {
       if (kind === "pre") {
         fire(
           "pre",
-          "Trading session soon",
+          `${strategy.name}: session soon`,
           `Session opens at ${schedule.sessionStart}. Get set up.`,
           "chime",
         );
       } else if (kind === "entryClose") {
         fire(
           "entryClose",
-          "Entry window closed",
+          `${strategy.name}: entry window closed`,
           "Log the session: entry state and adherence checklist.",
           "chime",
         );
       } else if (day.tradeState === "entered") {
         fire(
           "marketClose",
-          "Market closed — log your trade",
+          `${strategy.name}: market closed`,
           "Close the position if it is still open, then log the trade.",
           "alarm",
         );

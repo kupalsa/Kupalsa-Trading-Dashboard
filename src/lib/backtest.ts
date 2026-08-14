@@ -8,6 +8,8 @@
  * Schema and semantics come from GLD_STG_1_DASHBOARD_SPEC.md.
  */
 
+import { DEFAULT_STRATEGY_ID } from "./strategy";
+
 export type ZoneSide = "Upper" | "Lower";
 export type ZoneType = "Wick" | "Body";
 export type Direction = "Long" | "Short";
@@ -65,6 +67,7 @@ export interface Screenshot {
 
 export interface Opportunity {
   id: string;
+  strategyId: string;
   seq: number; // sequential display ID
 
   // Identification
@@ -134,9 +137,10 @@ export interface Opportunity {
   createdAt: string;
 }
 
-export function emptyOpportunity(seq: number): Opportunity {
+export function emptyOpportunity(seq: number, strategyId: string): Opportunity {
   return {
     id: crypto.randomUUID(),
+    strategyId,
     seq,
     date: "",
     ezSide: "",
@@ -391,6 +395,16 @@ export function expectancy(
       : 0,
     avgMfeR: mean(mfes),
     avgMaeR: mean(maes),
+  };
+}
+
+export function normalizeOpportunity(raw: Partial<Opportunity>): Opportunity {
+  return {
+    ...emptyOpportunity(raw.seq ?? 0, raw.strategyId ?? DEFAULT_STRATEGY_ID),
+    ...raw,
+    id: raw.id ?? crypto.randomUUID(),
+    strategyId: raw.strategyId ?? DEFAULT_STRATEGY_ID,
+    screenshots: raw.screenshots ?? [],
   };
 }
 

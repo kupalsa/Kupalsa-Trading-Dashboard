@@ -14,16 +14,19 @@ export interface DayState {
   fired: AlertKind[];
 }
 
-const KEY = "trading-dashboard-live-state";
+/** Each strategy tracks its own day state — they can run side by side. */
+function key(strategyId: string): string {
+  return `trading-dashboard-live-state:${strategyId}`;
+}
 
 export function todayStr(now = new Date()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 /** Day state resets automatically when the date rolls over. */
-export function loadDayState(now = new Date()): DayState {
+export function loadDayState(strategyId: string, now = new Date()): DayState {
   const fresh: DayState = { date: todayStr(now), tradeState: "pending", fired: [] };
-  const raw = localStorage.getItem(KEY);
+  const raw = localStorage.getItem(key(strategyId));
   if (!raw) return fresh;
   try {
     const parsed = JSON.parse(raw) as DayState;
@@ -33,6 +36,6 @@ export function loadDayState(now = new Date()): DayState {
   }
 }
 
-export function saveDayState(state: DayState): void {
-  localStorage.setItem(KEY, JSON.stringify(state));
+export function saveDayState(strategyId: string, state: DayState): void {
+  localStorage.setItem(key(strategyId), JSON.stringify(state));
 }

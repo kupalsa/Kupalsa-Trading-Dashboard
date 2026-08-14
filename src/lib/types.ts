@@ -1,10 +1,12 @@
 import { defaultSchedule, type SessionSchedule } from "./session";
+import { DEFAULT_STRATEGY_ID } from "./strategy";
 
 export type Direction = "Long" | "Short";
 export type Result = "W" | "L" | "BE";
 
 export interface Trade {
   id: string;
+  strategyId: string;
   date: string; // YYYY-MM-DD
   day: string; // derived weekday name
   entryTime: string; // HH:MM
@@ -58,14 +60,15 @@ export const emptyChecklist: DailyReviewChecklist = {
 };
 
 export interface DailyReview {
-  date: string; // YYYY-MM-DD
+  strategyId: string;
+  date: string; // YYYY-MM-DD — one review per strategy per day
   sessionOutcome: SessionOutcome | "";
   states: SessionState[]; // how the session felt — several can apply at once
   checklist: DailyReviewChecklist;
   notes: string;
 }
 
-/** Older reviews stored a single `entryState`; fold it into the array. */
+/** Older reviews stored a single `entryState` and no strategy. */
 export function normalizeDailyReview(raw: Partial<DailyReview> & { entryState?: string }): DailyReview {
   const legacy = raw.entryState;
   const states =
@@ -73,11 +76,30 @@ export function normalizeDailyReview(raw: Partial<DailyReview> & { entryState?: 
     (legacy && SESSION_STATES.includes(legacy as SessionState) ? [legacy as SessionState] : []);
 
   return {
+    strategyId: raw.strategyId ?? DEFAULT_STRATEGY_ID,
     date: raw.date ?? "",
     sessionOutcome: raw.sessionOutcome ?? "",
     states,
     checklist: { ...emptyChecklist, ...(raw.checklist ?? {}) },
     notes: raw.notes ?? "",
+  };
+}
+
+export function normalizeTrade(raw: Partial<Trade>): Trade {
+  return {
+    id: raw.id ?? crypto.randomUUID(),
+    strategyId: raw.strategyId ?? DEFAULT_STRATEGY_ID,
+    date: raw.date ?? "",
+    day: raw.day ?? "",
+    entryTime: raw.entryTime ?? "",
+    exitTime: raw.exitTime ?? "",
+    direction: raw.direction ?? "Long",
+    result: raw.result ?? "BE",
+    stopPoints: raw.stopPoints ?? 0,
+    rr: raw.rr ?? 0,
+    screenshotPath: raw.screenshotPath ?? null,
+    note: raw.note ?? "",
+    createdAt: raw.createdAt ?? new Date().toISOString(),
   };
 }
 

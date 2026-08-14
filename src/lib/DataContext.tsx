@@ -10,14 +10,18 @@ import {
 import { loadSettings, saveSettings, isGithubConfigured, type AppSettings } from "./settings";
 import { readJSON, writeBinary, writeJSON } from "./githubStore";
 import {
-  emptyRulesDoc,
   normalizeDailyReview,
-  normalizeRules,
+  normalizeTrade,
   type DailyReview,
   type RulesDoc,
   type Trade,
 } from "./types";
-import type { Opportunity } from "./backtest";
+import { normalizeOpportunity, type Opportunity } from "./backtest";
+import {
+  normalizeStrategies,
+  resolveSelection,
+  type Strategy,
+} from "./strategy";
 
 interface DataContextValue {
   settings: AppSettings;
@@ -26,8 +30,10 @@ interface DataContextValue {
 
   trades: Trade[];
   dailyReviews: DailyReview[];
-  rules: RulesDoc;
   opportunities: Opportunity[];
+  strategies: Strategy[];
+  selectedIds: string[];
+  setSelectedIds: (ids: string[]) => void;
   loading: boolean;
   error: string | null;
 
@@ -37,7 +43,10 @@ interface DataContextValue {
   deleteTrade: (id: string) => Promise<void>;
   saveScreenshot: (path: string, base64: string) => Promise<void>;
   saveDailyReview: (r: DailyReview) => Promise<void>;
-  saveRules: (r: RulesDoc) => Promise<void>;
+
+  saveStrategy: (s: Strategy) => Promise<void>;
+  deleteStrategy: (id: string) => Promise<void>;
+  savePlaybookImage: (path: string, base64: string) => Promise<void>;
 
   saveOpportunity: (o: Opportunity) => Promise<void>;
   deleteOpportunity: (id: string) => Promise<void>;
@@ -48,15 +57,27 @@ const DataContext = createContext<DataContextValue | null>(null);
 
 const TRADES_PATH = "data/trades.json";
 const REVIEWS_PATH = "data/daily-reviews.json";
-const RULES_PATH = "data/rules.json";
+const RULES_PATH = "data/rules.json"; // legacy; seeds the first strategy
 const OPPORTUNITIES_PATH = "data/opportunities.json";
+const STRATEGIES_PATH = "data/strategies.json";
+const SELECTION_KEY = "trading-dashboard-selected-strategies";
+
+function loadSelection(): string[] {
+  try {
+    const raw = localStorage.getItem(SELECTION_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   const [trades, setTrades] = useState<Trade[]>([]);
   const [dailyReviews, setDailyReviews] = useState<DailyReview[]>([]);
-  const [rules, setRules] = useState<RulesDoc>(emptyRulesDoc);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [selectedRaw, setSelectedRaw] = useState<string[]>(() => loadSelection());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,16 +93,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const [t, r, rl, ops] = await Promise.all([
-        readJSON<Trade[]>(settings, TRADES_PATH, []),
-        readJSON<DailyReview[]>(settings, REVIEWS_PATH, []),
-        readJSON<Partial<RulesDoc>>(settings, RULES_PATH, emptyRulesDoc),
-        readJSON<Opportunity[]>(settings, OPPORTUNITIES_PATH, []),
+      const [t, r, legacyRules, ops, strats] = await Promise.all([
+        readJSON<Partial<Trade>[]>(settings, TRADES_PATH, []),
+        readJSON<Partial<DailyReview>[]>(settings, REVIEWS_PATH, []),
+        readJSON<Partial<RulesDoc> | null>(settings, RULES_PATH, null),
+        readJSON<Partial<Opportunity>[]>(settings, OPPORTUNITIES_PATH, []),
+        readJSON<Partial<Strategy>[] | null>(settings, STRATEGIES_PATH, null),
       ]);
-      setTrades(t);
+      setTrades(t.map(normalizeTrade));
       setDailyReviews(r.map(normalizeDailyReview));
-      setRules(normalizeRules(rl));
-      setOpportunities(ops);
+      setOpportunities(ops.map(normalizeOpportunity));
+      setStrategies(normalizeStrategies(strats, legacyRules ?? undefined));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -94,6 +116,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.githubOwner, settings.githubRepo, settings.githubToken]);
 
+  const selectedIds = useMemo(
+    () => resolveSelection(strategies, selectedRaw),
+    [strategies, selectedRaw],
+  );
+
+  const setSelectedIds = useCallback((ids: string[]) => {
+    setSelectedRaw(ids);
+    localStorage.setItem(SELECTION_KEY, JSON.stringify(ids));
+  }, []);
+
   const persistTrades = useCallback(
     async (next: Trade[]) => {
       setTrades(next);
@@ -103,23 +135,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
 
   const addTrade = useCallback(
-    async (t: Trade) => {
-      await persistTrades([...trades, t]);
-    },
+    async (t: Trade) => persistTrades([...trades, t]),
     [trades, persistTrades],
   );
 
   const updateTrade = useCallback(
-    async (t: Trade) => {
-      await persistTrades(trades.map((x) => (x.id === t.id ? t : x)));
-    },
+    async (t: Trade) => persistTrades(trades.map((x) => (x.id === t.id ? t : x))),
     [trades, persistTrades],
   );
 
   const deleteTrade = useCallback(
-    async (id: string) => {
-      await persistTrades(trades.filter((x) => x.id !== id));
-    },
+    async (id: string) => persistTrades(trades.filter((x) => x.id !== id)),
     [trades, persistTrades],
   );
 
@@ -130,10 +156,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [settings],
   );
 
+  /** Reviews are keyed by strategy AND date. */
   const saveDailyReview = useCallback(
     async (r: DailyReview) => {
       const next = [
-        ...dailyReviews.filter((x) => x.date !== r.date),
+        ...dailyReviews.filter((x) => !(x.date === r.date && x.strategyId === r.strategyId)),
         r,
       ].sort((a, b) => a.date.localeCompare(b.date));
       setDailyReviews(next);
@@ -142,10 +169,42 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [dailyReviews, settings],
   );
 
-  const saveRules = useCallback(
-    async (r: RulesDoc) => {
-      setRules(r);
-      await writeJSON(settings, RULES_PATH, r, "Update strategy rules/notes");
+  const persistStrategies = useCallback(
+    async (next: Strategy[], message: string) => {
+      setStrategies(next);
+      await writeJSON(settings, STRATEGIES_PATH, next, message);
+    },
+    [settings],
+  );
+
+  const saveStrategy = useCallback(
+    async (s: Strategy) => {
+      const exists = strategies.some((x) => x.id === s.id);
+      const next = exists
+        ? strategies.map((x) => (x.id === s.id ? s : x))
+        : [...strategies, s];
+      await persistStrategies(next, `${exists ? "Update" : "Add"} strategy ${s.name}`);
+    },
+    [strategies, persistStrategies],
+  );
+
+  /** Deleting a strategy leaves its records in place rather than destroying them. */
+  const deleteStrategy = useCallback(
+    async (id: string) => {
+      if (strategies.length <= 1) throw new Error("At least one strategy must exist.");
+      const target = strategies.find((x) => x.id === id);
+      await persistStrategies(
+        strategies.filter((x) => x.id !== id),
+        `Delete strategy ${target?.name ?? id}`,
+      );
+      setSelectedIds(selectedIds.filter((x) => x !== id));
+    },
+    [strategies, persistStrategies, selectedIds, setSelectedIds],
+  );
+
+  const savePlaybookImage = useCallback(
+    async (path: string, base64: string) => {
+      await writeBinary(settings, path, base64, "Add playbook image");
     },
     [settings],
   );
@@ -158,7 +217,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [settings],
   );
 
-  /** Upsert by id, keeping the log ordered by date then sequence. */
   const saveOpportunity = useCallback(
     async (o: Opportunity) => {
       const exists = opportunities.some((x) => x.id === o.id);
@@ -199,8 +257,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       githubReady,
       trades,
       dailyReviews,
-      rules,
       opportunities,
+      strategies,
+      selectedIds,
+      setSelectedIds,
       loading,
       error,
       refresh,
@@ -209,7 +269,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteTrade,
       saveScreenshot,
       saveDailyReview,
-      saveRules,
+      saveStrategy,
+      deleteStrategy,
+      savePlaybookImage,
       saveOpportunity,
       deleteOpportunity,
       saveBacktestScreenshot,
@@ -220,8 +282,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       githubReady,
       trades,
       dailyReviews,
-      rules,
       opportunities,
+      strategies,
+      selectedIds,
+      setSelectedIds,
       loading,
       error,
       refresh,
@@ -230,7 +294,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteTrade,
       saveScreenshot,
       saveDailyReview,
-      saveRules,
+      saveStrategy,
+      deleteStrategy,
+      savePlaybookImage,
       saveOpportunity,
       deleteOpportunity,
       saveBacktestScreenshot,

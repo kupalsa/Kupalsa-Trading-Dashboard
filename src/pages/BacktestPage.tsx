@@ -55,8 +55,29 @@ function ExpectancyRow({
 }
 
 export default function BacktestPage() {
-  const { opportunities, githubReady, loading, deleteOpportunity, settings } = useData();
+  const {
+    opportunities: allOpportunities,
+    githubReady,
+    loading,
+    deleteOpportunity,
+    settings,
+    strategies,
+    selectedIds,
+  } = useData();
   const [editing, setEditing] = useState<Opportunity | null>(null);
+
+  // Expectancy per setup type is meaningless mixed across strategies, so the
+  // backtest always scopes to exactly one.
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const strategy =
+    strategies.find((s) => s.id === focusId) ??
+    strategies.find((s) => s.id === selectedIds[0]) ??
+    strategies[0];
+
+  const opportunities = useMemo(
+    () => allOpportunities.filter((o) => o.strategyId === strategy?.id),
+    [allOpportunities, strategy?.id],
+  );
   const [basis, setBasis] = useState<Basis>("optimized");
   const [population, setPopulation] = useState<Population>("all");
 
@@ -73,6 +94,7 @@ export default function BacktestPage() {
   if (!githubReady) {
     return <div className="panel">Connect GitHub in Settings to use the backtest log.</div>;
   }
+  if (!strategy) return <div className="panel">Create a strategy first.</div>;
 
   if (editing) {
     return (
@@ -86,8 +108,25 @@ export default function BacktestPage() {
   return (
     <div>
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
-        <h1 style={{ margin: 0 }}>Backtest</h1>
-        <button className="primary" onClick={() => setEditing(emptyOpportunity(nextSeq))}>
+        <div className="row">
+          <h1 style={{ margin: 0 }}>Backtest</h1>
+          {strategies.length > 1 ? (
+            <select
+              value={strategy.id}
+              onChange={(e) => setFocusId(e.target.value)}
+              style={{ maxWidth: 220 }}
+            >
+              {strategies.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="small-note">{strategy.name}</span>
+          )}
+        </div>
+        <button className="primary" onClick={() => setEditing(emptyOpportunity(nextSeq, strategy.id))}>
           + New opportunity
         </button>
       </div>

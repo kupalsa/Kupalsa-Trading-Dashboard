@@ -21,7 +21,22 @@ function Tile({ label, value, color }: { label: string; value: string; color?: s
 }
 
 export default function StatsPage() {
-  const { trades, dailyReviews, githubReady, loading } = useData();
+  const { trades: allTrades, dailyReviews: allReviews, githubReady, loading, strategies, selectedIds } =
+    useData();
+
+  // Stats is the one place data from several strategies merges.
+  const trades = useMemo(
+    () => allTrades.filter((t) => selectedIds.includes(t.strategyId)),
+    [allTrades, selectedIds],
+  );
+  const dailyReviews = useMemo(
+    () => allReviews.filter((r) => selectedIds.includes(r.strategyId)),
+    [allReviews, selectedIds],
+  );
+  const selectedNames = strategies
+    .filter((s) => selectedIds.includes(s.id))
+    .map((s) => s.name)
+    .join(" + ");
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -78,6 +93,7 @@ export default function StatsPage() {
             {MONTH_NAMES[month - 1]} {year}
           </h1>
           <button onClick={() => shiftMonth(1)}>&rarr;</button>
+          <span className="small-note">{selectedNames}</span>
           {loading && <span className="muted">Loading…</span>}
         </div>
 
