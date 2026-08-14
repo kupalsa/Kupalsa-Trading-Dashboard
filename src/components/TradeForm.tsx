@@ -4,6 +4,7 @@ import { compressImage } from "../lib/image";
 import { extractTradeFromScreenshot } from "../lib/extract";
 import { dayOfWeek } from "../lib/stats";
 import { isAnthropicConfigured } from "../lib/settings";
+import { screenshotUrl } from "../lib/githubStore";
 import type { Direction, Result, Trade } from "../lib/types";
 import ScreenshotDropzone from "./ScreenshotDropzone";
 import type { Strategy } from "../lib/strategy";
@@ -24,17 +25,38 @@ const emptyForm = {
   note: "",
 };
 
-export default function TradeForm({
-  strategy,
-  acceptPaste = true,
-}: {
+function formFromTrade(t: Trade) {
+  return {
+    date: t.date,
+    entryTime: t.entryTime,
+    exitTime: t.exitTime,
+    direction: t.direction,
+    result: t.result,
+    stopPoints: String(t.stopPoints),
+    rr: String(t.rr),
+    note: t.note,
+  };
+}
+
+interface Props {
   strategy: Strategy;
   /** With several strategies side by side, only the focused column takes a paste. */
   acceptPaste?: boolean;
-}) {
-  const { settings, addTrade, saveScreenshot } = useData();
-  const [form, setForm] = useState(emptyForm);
-  const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
+  /** Present to edit an existing trade instead of logging a new one. */
+  initial?: Trade;
+  onDone?: () => void;
+}
+
+export default function TradeForm({ strategy, acceptPaste = true, initial, onDone }: Props) {
+  const { settings, addTrade, updateTrade, saveScreenshot } = useData();
+  const isEdit = Boolean(initial);
+
+  const [form, setForm] = useState(() => (initial ? formFromTrade(initial) : emptyForm));
+  const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(
+    initial?.screenshotPath ? screenshotUrl(settings, initial.screenshotPath) : null,
+  );
+  // Whether the screenshot shown differs from what's already saved for this trade.
+  const [screenshotChanged, setScreenshotChanged] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -47,6 +69,7 @@ export default function TradeForm({
     setMessage(null);
     const compressed = await compressImage(file);
     setScreenshotDataUrl(compressed);
+    setScreenshotChanged(true);
 
     if (isAnthropicConfigured(settings)) {
       setExtracting(true);
@@ -87,19 +110,36 @@ export default function TradeForm({
   function resetForm() {
     setForm({ ...emptyForm, date: todayStr() });
     setScreenshotDataUrl(null);
+    setScreenshotChanged(false);
+  }
+
+  function clearScreenshot() {
+    setScreenshotDataUrl(null);
+    setScreenshotChanged(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!screenshotDataUrl) {
+    // A screenshot is only mandatory when logging a brand-new trade — edits of
+    // older trades (e.g. a bulk import) may legitimately have none.
+    if (!isEdit && !screenshotDataUrl) {
       setMessage({ kind: "error", text: "A screenshot is required before saving a trade." });
       return;
     }
     setSaving(true);
     setMessage(null);
     try {
-      const id = crypto.randomUUID();
-      const screenshotPath = `screenshots/${id}.jpg`;
+      const id = initial?.id ?? crypto.randomUUID();
+
+      let screenshotPath = initial?.screenshotPath ?? null;
+      if (screenshotChanged) {
+        if (screenshotDataUrl) {
+          screenshotPath = `screenshots/${id}.jpg`;
+          await saveScreenshot(screenshotPath, screenshotDataUrl.split(",")[1] ?? "");
+        } else {
+          screenshotPath = null;
+        }
+      }
 
       const trade: Trade = {
         id,
@@ -114,14 +154,18 @@ export default function TradeForm({
         rr: Number(form.rr),
         screenshotPath,
         note: form.note,
-        createdAt: new Date().toISOString(),
+        createdAt: initial?.createdAt ?? new Date().toISOString(),
       };
 
-      await addTrade(trade);
-      await saveScreenshot(screenshotPath, screenshotDataUrl.split(",")[1] ?? "");
-
-      setMessage({ kind: "ok", text: "Trade saved" });
-      resetForm();
+      if (isEdit) {
+        await updateTrade(trade);
+        setMessage({ kind: "ok", text: "Trade updated" });
+        onDone?.();
+      } else {
+        await addTrade(trade);
+        setMessage({ kind: "ok", text: "Trade saved" });
+        resetForm();
+      }
     } catch (e) {
       setMessage({ kind: "error", text: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -131,14 +175,14 @@ export default function TradeForm({
 
   return (
     <form className="panel" onSubmit={handleSubmit}>
-      <h2>Log a Trade</h2>
+      <h2>{isEdit ? `Edit Trade — ${initial?.date}` : "Log a Trade"}</h2>
 
       <div className="field" style={{ marginBottom: 12 }}>
-        <label>Screenshot (required)</label>
+        <label>Screenshot{isEdit ? "" : " (required)"}</label>
         <ScreenshotDropzone
           previewUrl={screenshotDataUrl}
           onFile={handleFile}
-          onClear={() => setScreenshotDataUrl(null)}
+          onClear={clearScreenshot}
           busy={extracting}
         />
       </div>
@@ -212,8 +256,13 @@ export default function TradeForm({
 
       <div className="row">
         <button type="submit" className="primary" disabled={saving || extracting}>
-          {saving ? "Saving…" : "Save trade"}
+          {saving ? "Saving…" : isEdit ? "Save changes" : "Save trade"}
         </button>
+        {isEdit && (
+          <button type="button" onClick={onDone} disabled={saving}>
+            Cancel
+          </button>
+        )}
         {message && (
           <span className={message.kind === "ok" ? "success-text" : "error-text"}>{message.text}</span>
         )}

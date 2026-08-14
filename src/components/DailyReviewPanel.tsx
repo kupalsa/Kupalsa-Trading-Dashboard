@@ -36,6 +36,15 @@ export default function DailyReviewPanel({ strategy }: { strategy: Strategy }) {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const history = useMemo(
+    () =>
+      dailyReviews
+        .filter((r) => r.strategyId === strategy.id)
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [dailyReviews, strategy.id],
+  );
 
   useEffect(() => {
     const existing = dailyReviews.find((r) => r.date === date && r.strategyId === strategy.id);
@@ -166,6 +175,35 @@ export default function DailyReviewPanel({ strategy }: { strategy: Strategy }) {
         </button>
         {saved && <span className="success-text">Saved</span>}
       </div>
+
+      <button
+        type="button"
+        className="history-toggle"
+        onClick={() => setHistoryOpen((o) => !o)}
+      >
+        {historyOpen ? "▾" : "▸"} Past reviews ({history.length})
+      </button>
+
+      {historyOpen && (
+        <div className="history-list">
+          {history.length === 0 && <p className="muted" style={{ margin: 0 }}>None logged yet.</p>}
+          {history.map((r) => (
+            <button
+              type="button"
+              key={r.date}
+              className={r.date === date ? "history-row active" : "history-row"}
+              onClick={() => setDate(r.date)}
+            >
+              <span className="history-date">{r.date}</span>
+              <span className={isAdherent(r) ? "pill win" : "pill loss"}>
+                {isAdherent(r) ? "Adherent" : "Not adherent"}
+              </span>
+              <span className="small-note">{r.sessionOutcome || "—"}</span>
+              <span className="small-note">{r.states.join(", ") || "—"}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
