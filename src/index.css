@@ -762,15 +762,15 @@ th {
 .day-cell.loss-day { border-color: var(--red); background: var(--tint-red); }
 .day-cell.loss-day .r-value { color: var(--red); }
 
-/* Today reads as a ring so it survives whatever colour the day already has. */
+/* Today is tinted like a win/loss day rather than ringed, so it sits at the
+   same visual weight as the rest of the month. */
 .day-cell.today {
-  box-shadow: 0 0 0 2px var(--accent);
   border-color: var(--accent);
+  background: var(--tint-accent);
 }
 
 .day-cell.today .date-num {
   color: var(--accent);
-  font-weight: 700;
 }
 
 /* Adherence sits on top of the R colouring as a corner mark and a left edge. */
