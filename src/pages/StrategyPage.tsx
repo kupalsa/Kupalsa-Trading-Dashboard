@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "../lib/DataContext";
 import PlaybookEditor from "../components/PlaybookEditor";
+import ConfirmDialog from "../components/ConfirmDialog";
 import type { SessionSchedule } from "../lib/session";
 import { STOP_FORMATS, type PlaybookStep, type Strategy, type StrategyDefinition } from "../lib/strategy";
 
@@ -21,6 +22,7 @@ export default function StrategyPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,12 +79,15 @@ export default function StrategyPage() {
   async function handleDelete() {
     if (!draft) return;
     setError(null);
+    setDeleteBusy(true);
     try {
       await deleteStrategy(draft.id);
       navigate("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setConfirmDelete(false);
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -368,21 +373,22 @@ export default function StrategyPage() {
           {error && <span className="error-text">{error}</span>}
         </div>
 
-        {strategies.length > 1 &&
-          (confirmDelete ? (
-            <div className="row">
-              <span className="small-note">Delete &ldquo;{draft.name}&rdquo;? Logged trades are kept.</span>
-              <button onClick={handleDelete} style={{ color: "var(--red)" }}>
-                Yes, delete
-              </button>
-              <button onClick={() => setConfirmDelete(false)}>Cancel</button>
-            </div>
-          ) : (
-            <button onClick={() => setConfirmDelete(true)} style={{ color: "var(--red)" }}>
-              Delete strategy
-            </button>
-          ))}
+        {strategies.length > 1 && (
+          <button className="danger" onClick={() => setConfirmDelete(true)}>
+            Delete strategy
+          </button>
+        )}
       </div>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete this strategy?"
+          message={`"${draft.name}" will be removed. Its logged trades, reviews and backtest opportunities are kept, just no longer grouped under this strategy.`}
+          busy={deleteBusy}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

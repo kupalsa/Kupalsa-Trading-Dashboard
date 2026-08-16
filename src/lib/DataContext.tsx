@@ -22,6 +22,12 @@ import {
   resolveSelection,
   type Strategy,
 } from "./strategy";
+import {
+  emptyTrash,
+  normalizeTrash,
+  purgeExpiredTrash,
+  type TrashDoc,
+} from "./trash";
 
 interface DataContextValue {
   settings: AppSettings;
@@ -32,6 +38,7 @@ interface DataContextValue {
   dailyReviews: DailyReview[];
   opportunities: Opportunity[];
   strategies: Strategy[];
+  trash: TrashDoc;
   selectedIds: string[];
   setSelectedIds: (ids: string[]) => void;
   loading: boolean;
@@ -41,6 +48,8 @@ interface DataContextValue {
   addTrade: (t: Trade) => Promise<void>;
   updateTrade: (t: Trade) => Promise<void>;
   deleteTrade: (id: string) => Promise<void>;
+  restoreTrade: (id: string) => Promise<void>;
+  purgeTrashedTrade: (id: string) => Promise<void>;
   saveScreenshot: (path: string, base64: string) => Promise<void>;
   saveDailyReview: (r: DailyReview) => Promise<void>;
 
@@ -50,7 +59,11 @@ interface DataContextValue {
 
   saveOpportunity: (o: Opportunity) => Promise<void>;
   deleteOpportunity: (id: string) => Promise<void>;
+  restoreOpportunity: (id: string) => Promise<void>;
+  purgeTrashedOpportunity: (id: string) => Promise<void>;
   saveBacktestScreenshot: (path: string, base64: string) => Promise<void>;
+
+  emptyTrashNow: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -60,6 +73,7 @@ const REVIEWS_PATH = "data/daily-reviews.json";
 const RULES_PATH = "data/rules.json"; // legacy; seeds the first strategy
 const OPPORTUNITIES_PATH = "data/opportunities.json";
 const STRATEGIES_PATH = "data/strategies.json";
+const TRASH_PATH = "data/trash.json";
 const SELECTION_KEY = "trading-dashboard-selected-strategies";
 
 function loadSelection(): string[] {
@@ -77,6 +91,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [dailyReviews, setDailyReviews] = useState<DailyReview[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [trash, setTrash] = useState<TrashDoc>(emptyTrash);
   const [selectedRaw, setSelectedRaw] = useState<string[]>(() => loadSelection());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,17 +108,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const [t, r, legacyRules, ops, strats] = await Promise.all([
+      const [t, r, legacyRules, ops, strats, trashRaw] = await Promise.all([
         readJSON<Partial<Trade>[]>(settings, TRADES_PATH, []),
         readJSON<Partial<DailyReview>[]>(settings, REVIEWS_PATH, []),
         readJSON<Partial<RulesDoc> | null>(settings, RULES_PATH, null),
         readJSON<Partial<Opportunity>[]>(settings, OPPORTUNITIES_PATH, []),
         readJSON<Partial<Strategy>[] | null>(settings, STRATEGIES_PATH, null),
+        readJSON<Partial<TrashDoc> | null>(settings, TRASH_PATH, null),
       ]);
       setTrades(t.map(normalizeTrade));
       setDailyReviews(r.map(normalizeDailyReview));
       setOpportunities(ops.map(normalizeOpportunity));
       setStrategies(normalizeStrategies(strats, legacyRules ?? undefined));
+
+      const loadedTrash = normalizeTrash(trashRaw);
+      const purged = purgeExpiredTrash(loadedTrash);
+      setTrash(purged);
+      if (purged !== loadedTrash) {
+        await writeJSON(settings, TRASH_PATH, purged, "Purge expired trash");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -134,6 +157,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [settings],
   );
 
+  const persistTrash = useCallback(
+    async (next: TrashDoc, message: string) => {
+      setTrash(next);
+      await writeJSON(settings, TRASH_PATH, next, message);
+    },
+    [settings],
+  );
+
   const addTrade = useCallback(
     async (t: Trade) => persistTrades([...trades, t]),
     [trades, persistTrades],
@@ -144,9 +175,42 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [trades, persistTrades],
   );
 
+  /** Deletes move a trade to the trash rather than destroying it outright. */
   const deleteTrade = useCallback(
-    async (id: string) => persistTrades(trades.filter((x) => x.id !== id)),
-    [trades, persistTrades],
+    async (id: string) => {
+      const target = trades.find((x) => x.id === id);
+      if (!target) return;
+      await persistTrades(trades.filter((x) => x.id !== id));
+      await persistTrash(
+        { ...trash, trades: [{ ...target, deletedAt: new Date().toISOString() }, ...trash.trades] },
+        `Trash trade ${target.date}`,
+      );
+    },
+    [trades, persistTrades, trash, persistTrash],
+  );
+
+  const restoreTrade = useCallback(
+    async (id: string) => {
+      const item = trash.trades.find((x) => x.id === id);
+      if (!item) return;
+      const { deletedAt: _deletedAt, ...trade } = item;
+      await persistTrades([...trades, trade]);
+      await persistTrash(
+        { ...trash, trades: trash.trades.filter((x) => x.id !== id) },
+        `Restore trade ${trade.date}`,
+      );
+    },
+    [trash, trades, persistTrades, persistTrash],
+  );
+
+  const purgeTrashedTrade = useCallback(
+    async (id: string) => {
+      await persistTrash(
+        { ...trash, trades: trash.trades.filter((x) => x.id !== id) },
+        "Permanently delete trade",
+      );
+    },
+    [trash, persistTrash],
   );
 
   const saveScreenshot = useCallback(
@@ -232,15 +296,56 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [opportunities, persistOpportunities],
   );
 
+  /** Deletes move an opportunity to the trash rather than destroying it outright. */
   const deleteOpportunity = useCallback(
     async (id: string) => {
       const target = opportunities.find((x) => x.id === id);
+      if (!target) return;
       await persistOpportunities(
         opportunities.filter((x) => x.id !== id),
-        `Delete opportunity #${target?.seq ?? ""}`,
+        `Delete opportunity #${target.seq}`,
+      );
+      await persistTrash(
+        {
+          ...trash,
+          opportunities: [{ ...target, deletedAt: new Date().toISOString() }, ...trash.opportunities],
+        },
+        `Trash opportunity #${target.seq}`,
       );
     },
-    [opportunities, persistOpportunities],
+    [opportunities, persistOpportunities, trash, persistTrash],
+  );
+
+  const restoreOpportunity = useCallback(
+    async (id: string) => {
+      const item = trash.opportunities.find((x) => x.id === id);
+      if (!item) return;
+      const { deletedAt: _deletedAt, ...opportunity } = item;
+      await persistOpportunities(
+        [...opportunities, opportunity].sort((a, b) => a.date.localeCompare(b.date) || a.seq - b.seq),
+        `Restore opportunity #${opportunity.seq}`,
+      );
+      await persistTrash(
+        { ...trash, opportunities: trash.opportunities.filter((x) => x.id !== id) },
+        `Restore opportunity #${opportunity.seq}`,
+      );
+    },
+    [trash, opportunities, persistOpportunities, persistTrash],
+  );
+
+  const purgeTrashedOpportunity = useCallback(
+    async (id: string) => {
+      await persistTrash(
+        { ...trash, opportunities: trash.opportunities.filter((x) => x.id !== id) },
+        "Permanently delete opportunity",
+      );
+    },
+    [trash, persistTrash],
+  );
+
+  const emptyTrashNow = useCallback(
+    async () => persistTrash(emptyTrash, "Empty trash"),
+    [persistTrash],
   );
 
   const saveBacktestScreenshot = useCallback(
@@ -259,6 +364,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dailyReviews,
       opportunities,
       strategies,
+      trash,
       selectedIds,
       setSelectedIds,
       loading,
@@ -267,6 +373,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addTrade,
       updateTrade,
       deleteTrade,
+      restoreTrade,
+      purgeTrashedTrade,
       saveScreenshot,
       saveDailyReview,
       saveStrategy,
@@ -274,7 +382,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       savePlaybookImage,
       saveOpportunity,
       deleteOpportunity,
+      restoreOpportunity,
+      purgeTrashedOpportunity,
       saveBacktestScreenshot,
+      emptyTrashNow,
     }),
     [
       settings,
@@ -284,6 +395,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dailyReviews,
       opportunities,
       strategies,
+      trash,
       selectedIds,
       setSelectedIds,
       loading,
@@ -292,6 +404,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addTrade,
       updateTrade,
       deleteTrade,
+      restoreTrade,
+      purgeTrashedTrade,
       saveScreenshot,
       saveDailyReview,
       saveStrategy,
@@ -299,7 +413,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       savePlaybookImage,
       saveOpportunity,
       deleteOpportunity,
+      restoreOpportunity,
+      purgeTrashedOpportunity,
       saveBacktestScreenshot,
+      emptyTrashNow,
     ],
   );
 

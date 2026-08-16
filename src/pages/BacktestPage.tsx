@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import OpportunityForm from "../components/OpportunityForm";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { RepoImageLink } from "../components/RepoImage";
 import {
   attemptedOnly,
@@ -64,6 +65,8 @@ export default function BacktestPage() {
     selectedIds,
   } = useData();
   const [editing, setEditing] = useState<Opportunity | null>(null);
+  const [deleting, setDeleting] = useState<Opportunity | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   // Expectancy per setup type is meaningless mixed across strategies, so the
   // backtest always scopes to exactly one.
@@ -89,6 +92,17 @@ export default function BacktestPage() {
   const standDowns = useMemo(() => standDownBreakdown(opportunities), [opportunities]);
 
   const families: SetupFamily[] = ["Reversal", "Continuation"];
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    try {
+      await deleteOpportunity(deleting.id);
+      setDeleting(null);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   if (!githubReady) {
     return <div className="panel">Connect GitHub in Settings to use the backtest log.</div>;
@@ -302,7 +316,9 @@ export default function BacktestPage() {
                       </td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         <button onClick={() => setEditing(o)}>Edit</button>{" "}
-                        <button onClick={() => deleteOpportunity(o.id)}>Delete</button>
+                        <button className="danger" onClick={() => setDeleting(o)}>
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   );
@@ -312,6 +328,16 @@ export default function BacktestPage() {
           </div>
         )}
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete this opportunity?"
+          message={`Opportunity #${deleting.seq} will move to Recently Deleted, where it can be restored for 7 days.`}
+          busy={deleteBusy}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
     </div>
   );
 }

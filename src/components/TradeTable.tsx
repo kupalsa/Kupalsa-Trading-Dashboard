@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import type { Trade } from "../lib/types";
 import TradeForm from "./TradeForm";
-import { RepoImageLink } from "./RepoImage";
+import ConfirmDialog from "./ConfirmDialog";
+import RepoImage from "./RepoImage";
 
 const PAGE_SIZES = [10, 50, 100] as const;
 type PageSize = (typeof PAGE_SIZES)[number];
@@ -24,8 +25,22 @@ export default function TradeTable({ strategyIds }: { strategyIds?: string[] }) 
   }, [trades, strategyIds]);
 
   const [editing, setEditing] = useState<Trade | null>(null);
+  const [viewingShot, setViewingShot] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Trade | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [pageSize, setPageSize] = useState<PageSize>(10);
   const [page, setPage] = useState(0);
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    try {
+      await deleteTrade(deleting.id);
+      setDeleting(null);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
 
@@ -122,7 +137,13 @@ export default function TradeTable({ strategyIds }: { strategyIds?: string[] }) 
                 </td>
                 <td>
                   {t.screenshotPath ? (
-                    <RepoImageLink path={t.screenshotPath}>view</RepoImageLink>
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() => setViewingShot(t.screenshotPath)}
+                    >
+                      view
+                    </button>
                   ) : (
                     "—"
                   )}
@@ -131,7 +152,9 @@ export default function TradeTable({ strategyIds }: { strategyIds?: string[] }) 
                 <td>
                   <div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>
                     <button onClick={() => setEditing(t)}>Edit</button>
-                    <button onClick={() => deleteTrade(t.id)}>Delete</button>
+                    <button className="danger" onClick={() => setDeleting(t)}>
+                      Delete
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -146,6 +169,27 @@ export default function TradeTable({ strategyIds }: { strategyIds?: string[] }) 
             <TradeForm strategy={editingStrategy} initial={editing} onDone={() => setEditing(null)} />
           </div>
         </div>
+      )}
+
+      {viewingShot && (
+        <div className="modal-backdrop" onClick={() => setViewingShot(null)}>
+          <div className="modal shot-modal" onClick={(e) => e.stopPropagation()}>
+            <RepoImage path={viewingShot} alt="Trade screenshot" className="screenshot-full" />
+            <div className="row" style={{ marginTop: 14 }}>
+              <button onClick={() => setViewingShot(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete this trade?"
+          message={`The ${deleting.date} ${deleting.direction} ${deleting.result} trade will move to Recently Deleted, where it can be restored for 7 days.`}
+          busy={deleteBusy}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleting(null)}
+        />
       )}
     </>
   );

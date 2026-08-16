@@ -137,6 +137,17 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button.danger {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+button.danger:hover:not(:disabled) {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--accent-ink);
+}
+
 a {
   color: var(--accent);
 }
@@ -340,6 +351,51 @@ a {
   color: var(--text-dim);
   padding: 6px 10px;
   text-align: left;
+  box-shadow: none;
+}
+
+.trash-link {
+  display: block;
+  width: 100%;
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 6px 10px;
+  text-align: left;
+  text-decoration: none;
+  border-radius: 3px;
+  margin-bottom: 2px;
+}
+
+.trash-link:hover, .trash-link.active {
+  color: var(--text);
+  background: var(--bg-panel-2);
+}
+
+.trash-count {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.trash-section {
+  margin-bottom: 8px;
+}
+
+.trash-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-panel-2);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.trash-row button {
+  font-size: 11px;
+  padding: 4px 9px;
   box-shadow: none;
 }
 
@@ -884,6 +940,33 @@ th {
 .screenshot-preview {
   max-width: 220px;
   max-height: 140px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.link-btn:hover:not(:disabled) {
+  color: var(--accent);
+  filter: brightness(1.2);
+}
+
+.modal.shot-modal {
+  max-width: 90vw;
+  text-align: center;
+}
+
+.screenshot-full {
+  max-width: 100%;
+  max-height: 80vh;
   border-radius: 3px;
   border: 1px solid var(--border);
 }

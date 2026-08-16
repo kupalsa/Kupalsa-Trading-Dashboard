@@ -1,4 +1,6 @@
 import { isAdherent, type DailyReview, type Trade } from "./types";
+import { isTradingDay } from "./session";
+import type { Strategy } from "./strategy";
 
 export interface MonthSummary {
   totalR: number;
@@ -54,6 +56,49 @@ export function adherentRate(reviews: DailyReview[]): number {
   if (reviews.length === 0) return 0;
   const adherentCount = reviews.filter(isAdherent).length;
   return (adherentCount / reviews.length) * 100;
+}
+
+export interface AdherenceStats {
+  rate: number; // 0-100
+  adherent: number;
+  total: number; // trading days that should have a review, logged or not
+}
+
+/**
+ * Adherence over a date range, counting every trading day a strategy should
+ * have logged — a day with no review at all counts as not adherent, same as
+ * one logged with an unchecked box. `from` is clamped to each strategy's
+ * creation date, so pass an early sentinel (e.g. epoch) for "since always".
+ */
+export function adherenceForRange(
+  strategies: Strategy[],
+  reviews: DailyReview[],
+  from: Date,
+  to: Date,
+): AdherenceStats {
+  const byKey = new Map<string, DailyReview>();
+  for (const r of reviews) byKey.set(`${r.strategyId}|${r.date}`, r);
+
+  let total = 0;
+  let adherent = 0;
+
+  for (const s of strategies) {
+    const created = new Date(s.createdAt);
+    const start = new Date(Math.max(from.getTime(), created.getTime()));
+    const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+
+    while (cur.getTime() <= end.getTime()) {
+      if (isTradingDay(cur, s.schedule)) {
+        total += 1;
+        const r = byKey.get(`${s.id}|${formatDate(cur)}`);
+        if (r && isAdherent(r)) adherent += 1;
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  return { rate: total > 0 ? (adherent / total) * 100 : 0, adherent, total };
 }
 
 /** Net R for each date within the trades list. */
@@ -152,7 +197,7 @@ export function summarize(trades: Trade[]): MonthSummary {
   };
 }
 
-function formatDate(d: Date): string {
+export function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 

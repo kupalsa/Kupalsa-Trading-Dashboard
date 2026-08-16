@@ -1,6 +1,8 @@
 import { buildCalendarWeeks, dailyR } from "../lib/stats";
+import { isTradingDay } from "../lib/session";
 import { isAdherent, type DailyReview } from "../lib/types";
 import type { Trade } from "../lib/types";
+import type { Strategy } from "../lib/strategy";
 
 interface Props {
   year: number;
@@ -8,6 +10,8 @@ interface Props {
   trades: Trade[];
   /** When provided, each day is also marked adherent / not adherent. */
   reviews?: DailyReview[];
+  /** Needed to tell which past days should have had a review but don't. */
+  strategies?: Strategy[];
   showAdherence?: boolean;
   showR?: boolean;
 }
@@ -22,6 +26,7 @@ export default function MonthCalendar({
   month,
   trades,
   reviews = [],
+  strategies = [],
   showAdherence = false,
   showR = true,
 }: Props) {
@@ -30,12 +35,31 @@ export default function MonthCalendar({
   const today = todayStr();
 
   // A date can hold reviews from several strategies; a day only counts as
-  // adherent when every review logged for it is.
+  // adherent when every strategy trading that day has a logged, adherent
+  // review — a trading day with no review at all counts as not adherent too.
   const adherenceByDate = new Map<string, boolean>();
-  for (const r of reviews) {
-    const prev = adherenceByDate.get(r.date);
-    const ok = isAdherent(r);
-    adherenceByDate.set(r.date, prev === undefined ? ok : prev && ok);
+  if (showAdherence) {
+    const reviewByKey = new Map<string, DailyReview>();
+    for (const r of reviews) reviewByKey.set(`${r.strategyId}|${r.date}`, r);
+
+    for (const week of weeks) {
+      for (const date of week) {
+        if (!date || date > today) continue;
+        const [y, m, d] = date.split("-").map(Number);
+        const dateObj = new Date(y, m - 1, d);
+
+        let dayAdherent: boolean | undefined;
+        for (const s of strategies) {
+          const created = new Date(s.createdAt);
+          const createdDate = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+          if (createdDate > dateObj || !isTradingDay(dateObj, s.schedule)) continue;
+          const r = reviewByKey.get(`${s.id}|${date}`);
+          const ok = r ? isAdherent(r) : false;
+          dayAdherent = dayAdherent === undefined ? ok : dayAdherent && ok;
+        }
+        if (dayAdherent !== undefined) adherenceByDate.set(date, dayAdherent);
+      }
+    }
   }
 
   return (

@@ -123,6 +123,11 @@ export function normalizeStrategies(
       strategyRules: legacy?.strategyRules ?? "",
       strategyNotes: legacy?.strategyNotes ?? "",
       schedule: { ...defaultSchedule, ...(legacy?.schedule ?? {}) },
+      // This seed is re-synthesized from legacy data every load until it's
+      // saved once — defaulting to "now" here would make the strategy look
+      // brand new on every session, which throws off anything that clamps a
+      // date range to createdAt (e.g. adherence-since-start calculations).
+      createdAt: new Date(0).toISOString(),
     }),
   ];
 }

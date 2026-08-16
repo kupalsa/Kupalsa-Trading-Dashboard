@@ -3,6 +3,7 @@ import { useData } from "../lib/DataContext";
 import { compressImage, dataUrlToBase64 } from "../lib/image";
 import { newPlaybookStep, playbookImagePath, type PlaybookStep } from "../lib/strategy";
 import ScreenshotDropzone from "./ScreenshotDropzone";
+import ConfirmDialog from "./ConfirmDialog";
 import { useRepoImage } from "./RepoImage";
 
 interface Props {
@@ -57,7 +58,7 @@ function PlaybookStepRow({
           <button onClick={() => onMove(1)} disabled={index === total - 1} title="Move down">
             ↓
           </button>
-          <button onClick={onDelete} title="Delete step">
+          <button className="danger" onClick={onDelete} title="Delete step">
             ✕
           </button>
         </div>
@@ -92,6 +93,7 @@ export default function PlaybookEditor({ strategyId, steps, onChange }: Props) {
   const { savePlaybookImage } = useData();
   const [pending, setPending] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   function update(id: string, patch: Partial<PlaybookStep>) {
     onChange(steps.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -147,13 +149,25 @@ export default function PlaybookEditor({ strategyId, steps, onChange }: Props) {
           busy={busy === step.id}
           onUpdate={(patch) => update(step.id, patch)}
           onMove={(d) => move(i, d)}
-          onDelete={() => onChange(steps.filter((s) => s.id !== step.id))}
+          onDelete={() => setConfirmDeleteId(step.id)}
           onFile={(f) => handleImage(step, f)}
           onClearImage={() => clearImage(step)}
         />
       ))}
 
       <button onClick={() => onChange([...steps, newPlaybookStep()])}>+ Add step</button>
+
+      {confirmDeleteId && (
+        <ConfirmDialog
+          title="Delete this step?"
+          message="The step and its image will be removed once you save the strategy."
+          onConfirm={() => {
+            onChange(steps.filter((s) => s.id !== confirmDeleteId));
+            setConfirmDeleteId(null);
+          }}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     </div>
   );
 }

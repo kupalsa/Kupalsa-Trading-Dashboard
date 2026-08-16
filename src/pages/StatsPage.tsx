@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import MonthCalendar from "../components/MonthCalendar";
-import { adherentRate, reviewsForMonth, summarize, tradesForMonth } from "../lib/stats";
+import { adherenceForRange, reviewsForMonth, summarize, tradesForMonth } from "../lib/stats";
 import { MAX_ZOOM, MIN_ZOOM, useUiZoom } from "../lib/useUiZoom";
 
 const MONTH_NAMES = [
@@ -33,6 +33,10 @@ export default function StatsPage() {
     () => allReviews.filter((r) => selectedIds.includes(r.strategyId)),
     [allReviews, selectedIds],
   );
+  const scopedStrategies = useMemo(
+    () => strategies.filter((s) => selectedIds.includes(s.id)),
+    [strategies, selectedIds],
+  );
   const selectedNames = strategies
     .filter((s) => selectedIds.includes(s.id))
     .map((s) => s.name)
@@ -52,8 +56,20 @@ export default function StatsPage() {
     () => reviewsForMonth(dailyReviews, year, month),
     [dailyReviews, year, month],
   );
-  const monthAdherence = useMemo(() => adherentRate(monthReviews), [monthReviews]);
-  const overallAdherence = useMemo(() => adherentRate(dailyReviews), [dailyReviews]);
+
+  // A trading day with no review at all counts as not adherent, same as one
+  // logged with an unchecked box — silence isn't neutral here.
+  const monthAdherence = useMemo(() => {
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0);
+    const cutoff = now < monthEnd ? now : monthEnd;
+    return adherenceForRange(scopedStrategies, dailyReviews, monthStart, cutoff);
+  }, [scopedStrategies, dailyReviews, year, month, now]);
+
+  const overallAdherence = useMemo(
+    () => adherenceForRange(scopedStrategies, dailyReviews, new Date(0), now),
+    [scopedStrategies, dailyReviews, now],
+  );
 
   // Re-fit when the data or month changes the content height.
   useEffect(() => {
@@ -136,6 +152,7 @@ export default function StatsPage() {
             month={month}
             trades={monthTrades}
             reviews={monthReviews}
+            strategies={scopedStrategies}
             showAdherence={showAdherence}
           />
         </div>
@@ -160,7 +177,7 @@ export default function StatsPage() {
               <Tile label="Losing Days" value={String(summary.losingDays)} color="var(--red)" />
               <Tile
                 label="Adherent"
-                value={monthReviews.length ? `${monthAdherence.toFixed(0)}%` : "—"}
+                value={monthAdherence.total ? `${monthAdherence.rate.toFixed(0)}%` : "—"}
               />
             </div>
           </div>
@@ -178,7 +195,7 @@ export default function StatsPage() {
               <Tile label="Trades / Week" value={overall.tradesPerWeek.toFixed(1)} />
               <Tile
                 label="Adherent"
-                value={dailyReviews.length ? `${overallAdherence.toFixed(0)}%` : "—"}
+                value={overallAdherence.total ? `${overallAdherence.rate.toFixed(0)}%` : "—"}
               />
               <Tile label="Avg Duration" value={overall.avgTradeDuration} />
               <Tile label="Max Win Streak" value={String(overall.maxWinStreak)} />

@@ -9,10 +9,12 @@ import StatsPage from "./pages/StatsPage";
 import StrategyPage from "./pages/StrategyPage";
 import BacktestPage from "./pages/BacktestPage";
 import SettingsPage from "./pages/SettingsPage";
+import TrashPage from "./pages/TrashPage";
 
 function Sidebar() {
-  const { githubReady } = useData();
+  const { githubReady, trash } = useData();
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
+  const trashCount = trash.trades.length + trash.opportunities.length;
 
   useEffect(() => {
     applyTheme(theme);
@@ -33,6 +35,9 @@ function Sidebar() {
       </NavLink>
 
       <div className="sidebar-footer">
+        <NavLink to="/trash" className={({ isActive }) => `trash-link${isActive ? " active" : ""}`}>
+          🗑 Recently deleted{trashCount > 0 && <span className="trash-count"> ({trashCount})</span>}
+        </NavLink>
         <button
           className="theme-toggle"
           onClick={() => setTheme(theme === "light" ? "dark" : "light")}
@@ -56,6 +61,7 @@ function AppShell() {
           <Route path="/strategy/:id" element={<StrategyPage />} />
           <Route path="/backtest" element={<BacktestPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/trash" element={<TrashPage />} />
         </Routes>
       </div>
       <SessionReminder />
