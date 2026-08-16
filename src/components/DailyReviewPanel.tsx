@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
-import { sessionConcluded } from "../lib/session";
+import { isTradingDay, sessionConcluded } from "../lib/session";
 import ReviewMiniCalendar from "./ReviewMiniCalendar";
 import type { Strategy } from "../lib/strategy";
 import {
@@ -65,10 +65,19 @@ export default function DailyReviewPanel({ strategy }: { strategy: Strategy }) {
 
   const adherent = isAdherent({ strategyId: strategy.id, date, sessionOutcome, states, checklist, notes });
 
+  // A date this strategy doesn't trade has no session to review — it can still
+  // be logged by hand, it just isn't owed one.
+  const tradingDate = useMemo(() => {
+    if (!date) return false;
+    const [y, m, d] = date.split("-").map(Number);
+    return isTradingDay(new Date(y, m - 1, d), strategy.schedule);
+  }, [date, strategy.schedule]);
+
   // Flag an unlogged session, but only once its entry window has shut —
   // glowing all morning about a session that hasn't happened is just noise.
   const alreadySaved = dailyReviews.some((r) => r.date === date && r.strategyId === strategy.id);
-  const needsLog = !alreadySaved && sessionConcluded(date, new Date(), strategy.schedule);
+  const needsLog =
+    !alreadySaved && tradingDate && sessionConcluded(date, new Date(), strategy.schedule);
 
   function toggle(key: keyof DailyReviewChecklist) {
     setChecklist((c) => ({ ...c, [key]: !c[key] }));
@@ -106,12 +115,14 @@ export default function DailyReviewPanel({ strategy }: { strategy: Strategy }) {
           <label>Date</label>
           <input
             type="date"
-            className={alreadySaved ? "date-logged" : "date-unlogged"}
+            className={alreadySaved ? "date-logged" : tradingDate ? "date-unlogged" : undefined}
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
-          <span className={alreadySaved ? "success-text" : "warn-text"}>
-            {alreadySaved ? "Logged" : "Not logged"}
+          <span
+            className={alreadySaved ? "success-text" : tradingDate ? "warn-text" : "small-note"}
+          >
+            {alreadySaved ? "Logged" : tradingDate ? "Not logged" : "Not a trading day"}
           </span>
         </div>
         <div className="field">

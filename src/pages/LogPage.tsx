@@ -17,7 +17,6 @@ export default function LogPage() {
     [strategies, selectedIds],
   );
 
-  // Only strategies that actually trade today get a column.
   const now = new Date();
   const todays = useMemo(
     () => selected.filter((s) => isTradingDay(now, s.schedule)),
@@ -37,7 +36,11 @@ export default function LogPage() {
     );
   }
 
-  const columns: Strategy[] = todays.length > 0 ? todays : [];
+  // Every selected strategy gets a column, trading day or not: a session or
+  // trade missed earlier in the week has to be loggable after the fact. The
+  // live panel is the only genuinely day-specific piece, so it's the one thing
+  // that drops out on an off day.
+  const columns: Strategy[] = selected;
   const activePaste = pasteTarget ?? columns[0]?.id ?? null;
 
   return (
@@ -46,7 +49,7 @@ export default function LogPage() {
       {error && <p className="error-text">{error}</p>}
       {loading && <p className="muted">Loading…</p>}
 
-      {columns.length === 0 && (
+      {todays.length === 0 && (
         <div className="panel">
           <h2>Nothing scheduled today</h2>
           <p className="muted" style={{ margin: 0 }}>
@@ -54,7 +57,7 @@ export default function LogPage() {
               ? "No strategy selected."
               : `${selected.map((s) => s.name).join(" and ")} ${
                   selected.length === 1 ? "does not trade" : "do not trade"
-                } today. Pick a different strategy in the sidebar, or adjust its trading days.`}
+                } today — so there is no live session below. You can still catch up on anything you missed: set the date on either form to a past day.`}
           </p>
         </div>
       )}
@@ -73,7 +76,7 @@ export default function LogPage() {
                 {activePaste === s.id && <span className="small-note">paste goes here</span>}
               </div>
             )}
-            <LiveSessionPanel strategy={s} />
+            {isTradingDay(now, s.schedule) && <LiveSessionPanel strategy={s} />}
             <TradeForm strategy={s} acceptPaste={activePaste === s.id} />
             <DailyReviewPanel strategy={s} />
           </section>
