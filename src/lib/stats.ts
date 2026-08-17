@@ -68,7 +68,11 @@ export interface AdherenceStats {
  * Adherence over a date range, counting every trading day a strategy should
  * have logged — a day with no review at all counts as not adherent, same as
  * one logged with an unchecked box. `from` is clamped to each strategy's
- * creation date, so pass an early sentinel (e.g. epoch) for "since always".
+ * `createdAt`, so pass an early sentinel (e.g. epoch) for "since always" and
+ * pass strategies whose `createdAt` has been overridden to their earliest
+ * actual activity (see `earliestActivityDate`) rather than the record's own
+ * creation timestamp — otherwise days before the app started tracking the
+ * strategy object (but when you were already trading it) go uncounted.
  */
 export function adherenceForRange(
   strategies: Strategy[],
@@ -101,6 +105,30 @@ export function adherenceForRange(
   return { rate: total > 0 ? (adherent / total) * 100 : 0, adherent, total };
 }
 
+/** Earliest date a strategy has any trade or review, or null if it has neither. */
+export function earliestActivityDate(
+  strategyId: string,
+  trades: Trade[],
+  reviews: DailyReview[],
+): string | null {
+  let min: string | null = null;
+  for (const t of trades) {
+    if (t.strategyId === strategyId && t.date && (min === null || t.date < min)) min = t.date;
+  }
+  for (const r of reviews) {
+    if (r.strategyId === strategyId && r.date && (min === null || r.date < min)) min = r.date;
+  }
+  return min;
+}
+
+/** Elapsed time from a date to `to`, in months (30.44-day average month). */
+export function monthsSince(fromDateStr: string, to: Date): number {
+  const [y, m, d] = fromDateStr.split("-").map(Number);
+  const from = new Date(y, m - 1, d);
+  const days = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24);
+  return days / 30.4368;
+}
+
 /** Net R for each date within the trades list. */
 export function dailyR(trades: Trade[]): Map<string, number> {
   const map = new Map<string, number>();
@@ -110,9 +138,9 @@ export function dailyR(trades: Trade[]): Map<string, number> {
   return map;
 }
 
-/** Average entry->exit duration as H:MM. Exits before entry are treated as crossing midnight. */
-function avgDuration(trades: Trade[]): string {
-  const durations = trades
+/** Entry->exit duration of each trade, in minutes. Exits before entry are treated as crossing midnight. */
+function tradeDurationsMinutes(trades: Trade[]): number[] {
+  return trades
     .filter((t) => t.entryTime && t.exitTime)
     .map((t) => {
       const [eh, em] = t.entryTime.split(":").map(Number);
@@ -121,9 +149,20 @@ function avgDuration(trades: Trade[]): string {
       if (mins < 0) mins += 24 * 60;
       return mins;
     });
+}
+
+/** Average entry->exit duration as H:MM. */
+function avgDuration(trades: Trade[]): string {
+  const durations = tradeDurationsMinutes(trades);
   if (durations.length === 0) return "--:--";
   const avg = Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
   return `${Math.floor(avg / 60)}:${(avg % 60).toString().padStart(2, "0")}`;
+}
+
+/** Total time spent in trades, in hours, summed across the list. */
+export function totalDurationHours(trades: Trade[]): number {
+  const totalMinutes = tradeDurationsMinutes(trades).reduce((a, b) => a + b, 0);
+  return totalMinutes / 60;
 }
 
 function avgTimeOfDay(times: string[]): string {

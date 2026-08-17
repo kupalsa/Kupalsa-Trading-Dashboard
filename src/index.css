@@ -829,20 +829,18 @@ th {
   color: var(--accent);
 }
 
-/* Adherence sits on top of the R colouring as a corner mark and a left edge. */
-.day-cell.adherent { border-left: 3px solid var(--green); }
-.day-cell.not-adherent { border-left: 3px solid var(--amber); }
-
+/* Adherence sits on top of the R colouring as a corner mark. */
 .adherence-mark {
   position: absolute;
-  top: 5%;
+  bottom: 5%;
   right: 7%;
   font-size: 16cqw;
   line-height: 1;
+  font-weight: 700;
 }
 
 .adherence-mark.ok { color: var(--green); }
-.adherence-mark.bad { color: var(--amber); }
+.adherence-mark.bad { color: var(--red); }
 
 .day-cell { position: relative; }
 

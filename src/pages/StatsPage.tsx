@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import MonthCalendar from "../components/MonthCalendar";
-import { adherenceForRange, reviewsForMonth, summarize, tradesForMonth } from "../lib/stats";
+import {
+  adherenceForRange,
+  earliestActivityDate,
+  monthsSince,
+  reviewsForMonth,
+  summarize,
+  totalDurationHours,
+  tradesForMonth,
+} from "../lib/stats";
 import { MAX_ZOOM, MIN_ZOOM, useUiZoom } from "../lib/useUiZoom";
 
 const MONTH_NAMES = [
@@ -37,6 +45,20 @@ export default function StatsPage() {
     () => strategies.filter((s) => selectedIds.includes(s.id)),
     [strategies, selectedIds],
   );
+
+  // Adherence should be judged from when a strategy was actually traded, not
+  // from whenever its record happened to be (re)created in the app — a
+  // strategy carried over from before the multi-strategy feature existed
+  // otherwise looks freshly created and its whole trading history goes
+  // unjudged. Override createdAt with the earliest real activity instead.
+  const adherenceStrategies = useMemo(
+    () =>
+      scopedStrategies.map((s) => {
+        const start = earliestActivityDate(s.id, allTrades, allReviews);
+        return start ? { ...s, createdAt: `${start}T00:00:00.000Z` } : s;
+      }),
+    [scopedStrategies, allTrades, allReviews],
+  );
   const selectedNames = strategies
     .filter((s) => selectedIds.includes(s.id))
     .map((s) => s.name)
@@ -63,13 +85,29 @@ export default function StatsPage() {
     const monthStart = new Date(year, month - 1, 1);
     const monthEnd = new Date(year, month, 0);
     const cutoff = now < monthEnd ? now : monthEnd;
-    return adherenceForRange(scopedStrategies, dailyReviews, monthStart, cutoff);
-  }, [scopedStrategies, dailyReviews, year, month, now]);
+    return adherenceForRange(adherenceStrategies, dailyReviews, monthStart, cutoff);
+  }, [adherenceStrategies, dailyReviews, year, month, now]);
 
   const overallAdherence = useMemo(
-    () => adherenceForRange(scopedStrategies, dailyReviews, new Date(0), now),
-    [scopedStrategies, dailyReviews, now],
+    () => adherenceForRange(adherenceStrategies, dailyReviews, new Date(0), now),
+    [adherenceStrategies, dailyReviews, now],
   );
+
+  // How long you've actually been trading these strategies, for the "since
+  // always" tile — earliest activity across whichever ones are selected.
+  const durationMonths = useMemo(() => {
+    const starts = scopedStrategies
+      .map((s) => earliestActivityDate(s.id, allTrades, allReviews))
+      .filter((d): d is string => d !== null);
+    if (starts.length === 0) return null;
+    const earliest = starts.reduce((min, d) => (d < min ? d : min));
+    return monthsSince(earliest, now);
+  }, [scopedStrategies, allTrades, allReviews, now]);
+
+  const avgHoursPerMonth = useMemo(() => {
+    if (!durationMonths) return null;
+    return totalDurationHours(trades) / durationMonths;
+  }, [trades, durationMonths]);
 
   // Re-fit when the data or month changes the content height.
   useEffect(() => {
@@ -152,7 +190,7 @@ export default function StatsPage() {
             month={month}
             trades={monthTrades}
             reviews={monthReviews}
-            strategies={scopedStrategies}
+            strategies={adherenceStrategies}
             showAdherence={showAdherence}
           />
         </div>
@@ -193,6 +231,14 @@ export default function StatsPage() {
               <Tile label="Win Rate" value={`${overall.winRate.toFixed(0)}%`} />
               <Tile label="Trades" value={String(overall.numTrades)} />
               <Tile label="Trades / Week" value={overall.tradesPerWeek.toFixed(1)} />
+              <Tile
+                label="Total Duration"
+                value={durationMonths != null ? `${durationMonths.toFixed(1)} mo` : "—"}
+              />
+              <Tile
+                label="Avg Hours / Month"
+                value={avgHoursPerMonth != null ? avgHoursPerMonth.toFixed(1) : "—"}
+              />
               <Tile
                 label="Adherent"
                 value={overallAdherence.total ? `${overallAdherence.rate.toFixed(0)}%` : "—"}
