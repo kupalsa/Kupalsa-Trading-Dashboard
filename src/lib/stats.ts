@@ -159,12 +159,6 @@ function avgDuration(trades: Trade[]): string {
   return `${Math.floor(avg / 60)}:${(avg % 60).toString().padStart(2, "0")}`;
 }
 
-/** Total time spent in trades, in hours, summed across the list. */
-export function totalDurationHours(trades: Trade[]): number {
-  const totalMinutes = tradeDurationsMinutes(trades).reduce((a, b) => a + b, 0);
-  return totalMinutes / 60;
-}
-
 function avgTimeOfDay(times: string[]): string {
   if (times.length === 0) return "--:--";
   const totalMinutes = times.reduce((sum, t) => {

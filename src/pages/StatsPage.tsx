@@ -7,7 +7,6 @@ import {
   monthsSince,
   reviewsForMonth,
   summarize,
-  totalDurationHours,
   tradesForMonth,
 } from "../lib/stats";
 import { MAX_ZOOM, MIN_ZOOM, useUiZoom } from "../lib/useUiZoom";
@@ -104,10 +103,10 @@ export default function StatsPage() {
     return monthsSince(earliest, now);
   }, [scopedStrategies, allTrades, allReviews, now]);
 
-  const avgHoursPerMonth = useMemo(() => {
+  const avgRPerMonth = useMemo(() => {
     if (!durationMonths) return null;
-    return totalDurationHours(trades) / durationMonths;
-  }, [trades, durationMonths]);
+    return overall.totalR / durationMonths;
+  }, [overall.totalR, durationMonths]);
 
   // Re-fit when the data or month changes the content height.
   useEffect(() => {
@@ -236,8 +235,9 @@ export default function StatsPage() {
                 value={durationMonths != null ? `${durationMonths.toFixed(1)} mo` : "—"}
               />
               <Tile
-                label="Avg Hours / Month"
-                value={avgHoursPerMonth != null ? avgHoursPerMonth.toFixed(1) : "—"}
+                label="Avg R / Month"
+                value={avgRPerMonth != null ? avgRPerMonth.toFixed(2) : "—"}
+                color={avgRPerMonth != null ? rColor(avgRPerMonth) : undefined}
               />
               <Tile
                 label="Adherent"
