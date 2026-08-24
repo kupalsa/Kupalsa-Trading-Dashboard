@@ -145,3 +145,8 @@ export function resolveSelection(strategies: Strategy[], selected: string[]): st
 export function playbookImagePath(strategyId: string, stepId: string): string {
   return `strategy-assets/${strategyId}/${stepId}.jpg`;
 }
+
+/** A user-uploaded HTML helper tool (e.g. a trade-logging wizard), re-uploaded to update. */
+export function backtestHelperPath(strategyId: string): string {
+  return `strategy-assets/${strategyId}/backtest-helper.html`;
+}

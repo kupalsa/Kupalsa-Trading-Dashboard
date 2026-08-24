@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import OpportunityForm from "../components/OpportunityForm";
 import ConfirmDialog from "../components/ConfirmDialog";
+import BacktestHelperPanel from "../components/BacktestHelperPanel";
 import { RepoImageLink } from "../components/RepoImage";
 import {
   attemptedOnly,
@@ -145,6 +146,8 @@ export default function BacktestPage() {
       </div>
 
       {loading && <p className="muted">Loading…</p>}
+
+      <BacktestHelperPanel strategyId={strategy.id} />
 
       <div className="panel">
         <h2>Expectancy</h2>

@@ -969,6 +969,15 @@ th {
   border: 1px solid var(--border);
 }
 
+.helper-frame {
+  display: block;
+  width: 100%;
+  height: 640px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
 textarea {
   resize: vertical;
   min-height: 60px;

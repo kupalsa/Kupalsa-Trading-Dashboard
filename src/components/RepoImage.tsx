@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useData } from "../lib/DataContext";
-import { fetchRepoImage } from "../lib/githubStore";
+import { fetchRepoFile } from "../lib/githubStore";
 
 /** Resolves a repo-relative image path to a usable object URL. */
 export function useRepoImage(path: string | null | undefined): {
@@ -22,7 +22,7 @@ export function useRepoImage(path: string | null | undefined): {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchRepoImage(settings, path)
+    fetchRepoFile(settings, path)
       .then((u) => {
         if (!cancelled) setUrl(u);
       })

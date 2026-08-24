@@ -62,6 +62,7 @@ interface DataContextValue {
   restoreOpportunity: (id: string) => Promise<void>;
   purgeTrashedOpportunity: (id: string) => Promise<void>;
   saveBacktestScreenshot: (path: string, base64: string) => Promise<void>;
+  saveBacktestHelper: (path: string, base64: string) => Promise<void>;
 
   emptyTrashNow: () => Promise<void>;
 }
@@ -355,6 +356,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [settings],
   );
 
+  const saveBacktestHelper = useCallback(
+    async (path: string, base64: string) => {
+      await writeBinary(settings, path, base64, "Update backtest helper tool");
+    },
+    [settings],
+  );
+
   const value = useMemo<DataContextValue>(
     () => ({
       settings,
@@ -385,6 +393,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       restoreOpportunity,
       purgeTrashedOpportunity,
       saveBacktestScreenshot,
+      saveBacktestHelper,
       emptyTrashNow,
     }),
     [
@@ -416,6 +425,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       restoreOpportunity,
       purgeTrashedOpportunity,
       saveBacktestScreenshot,
+      saveBacktestHelper,
       emptyTrashNow,
     ],
   );

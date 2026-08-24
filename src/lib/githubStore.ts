@@ -130,19 +130,19 @@ export async function testConnection(s: AppSettings): Promise<string> {
 }
 
 /**
- * Images live in a private repo, so raw.githubusercontent.com URLs 404 — the
- * browser can't attach the token to a plain <img src>. Fetch the bytes through
- * the API instead and hand back an object URL.
+ * Repo files live in a private repo, so raw.githubusercontent.com URLs 404 —
+ * the browser can't attach the token to a plain <img src> or <iframe src>.
+ * Fetch the bytes through the API instead and hand back an object URL. Works
+ * for any file type (images, the uploaded backtest-helper HTML, etc.).
  *
- * Results are cached per path: the same screenshot is often rendered in a list
- * and then again in an editor, and blobs are cheap to keep but wasteful to
- * refetch.
+ * Results are cached per path: the same file is often rendered in a list and
+ * then again in an editor, and blobs are cheap to keep but wasteful to refetch.
  */
-const imageCache = new Map<string, Promise<string>>();
+const fileCache = new Map<string, Promise<string>>();
 
-export function fetchRepoImage(s: AppSettings, path: string): Promise<string> {
+export function fetchRepoFile(s: AppSettings, path: string): Promise<string> {
   const key = `${s.githubOwner}/${s.githubRepo}/${path}`;
-  const hit = imageCache.get(key);
+  const hit = fileCache.get(key);
   if (hit) return hit;
 
   const load = (async () => {
@@ -151,7 +151,7 @@ export function fetchRepoImage(s: AppSettings, path: string): Promise<string> {
     });
     if (!res.ok) {
       throw new GithubApiError(
-        `Could not load image ${path} (${res.status})`,
+        `Could not load ${path} (${res.status})`,
         res.status,
       );
     }
@@ -159,11 +159,29 @@ export function fetchRepoImage(s: AppSettings, path: string): Promise<string> {
   })();
 
   // A failed load shouldn't be cached forever — let the next render retry.
-  load.catch(() => imageCache.delete(key));
-  imageCache.set(key, load);
+  load.catch(() => fileCache.delete(key));
+  fileCache.set(key, load);
   return load;
 }
 
-export function forgetRepoImage(s: AppSettings, path: string): void {
-  imageCache.delete(`${s.githubOwner}/${s.githubRepo}/${path}`);
+export function forgetRepoFile(s: AppSettings, path: string): void {
+  fileCache.delete(`${s.githubOwner}/${s.githubRepo}/${path}`);
+}
+
+/**
+ * Fetch a repo file as text rather than a blob URL. Needed for HTML rendered
+ * via <iframe srcDoc> — a sandboxed iframe without `allow-same-origin` can't
+ * resolve a blob: URL (it fails to load, silently, with no console error),
+ * and granting allow-same-origin to load one would give the iframe's script
+ * the app's own origin, defeating the sandbox entirely. srcDoc sidesteps the
+ * problem: no URL to resolve, so the sandbox stays intact.
+ */
+export async function fetchRepoText(s: AppSettings, path: string): Promise<string> {
+  const res = await fetch(`${apiBase(s)}/${path}`, {
+    headers: { ...headers(s), Accept: "application/vnd.github.raw" },
+  });
+  if (!res.ok) {
+    throw new GithubApiError(`Could not load ${path} (${res.status})`, res.status);
+  }
+  return res.text();
 }
