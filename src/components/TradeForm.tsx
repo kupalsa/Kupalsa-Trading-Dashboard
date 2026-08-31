@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useData } from "../lib/DataContext";
 import { compressImage } from "../lib/image";
-import { extractTradeFromScreenshot } from "../lib/extract";
 import { dayOfWeek } from "../lib/stats";
-import { isAnthropicConfigured } from "../lib/settings";
 import type { Direction, Result, Trade } from "../lib/types";
 import ScreenshotDropzone from "./ScreenshotDropzone";
 import { useRepoImage } from "./RepoImage";
@@ -48,7 +46,7 @@ interface Props {
 }
 
 export default function TradeForm({ strategy, acceptPaste = true, initial, onDone }: Props) {
-  const { settings, addTrade, updateTrade, saveScreenshot } = useData();
+  const { addTrade, updateTrade, saveScreenshot } = useData();
   const isEdit = Boolean(initial);
 
   const [form, setForm] = useState(() => (initial ? formFromTrade(initial) : emptyForm));
@@ -57,10 +55,6 @@ export default function TradeForm({ strategy, acceptPaste = true, initial, onDon
   const [screenshotChanged, setScreenshotChanged] = useState(false);
   // The stored image is private-repo content, so it has to be fetched with auth.
   const storedShot = useRepoImage(screenshotChanged ? null : initial?.screenshotPath);
-  // Editing usually means correcting a field, not re-reading the chart — so
-  // auto-extraction starts off there and on for a brand-new trade.
-  const [autoExtract, setAutoExtract] = useState(!isEdit);
-  const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
@@ -73,27 +67,7 @@ export default function TradeForm({ strategy, acceptPaste = true, initial, onDon
     const compressed = await compressImage(file);
     setScreenshotDataUrl(compressed);
     setScreenshotChanged(true);
-
-    if (autoExtract && isAnthropicConfigured(settings)) {
-      setExtracting(true);
-      try {
-        const extracted = await extractTradeFromScreenshot(settings, compressed);
-        setForm((f) => ({
-          ...f,
-          date: extracted.date ?? f.date,
-          entryTime: extracted.entryTime ?? f.entryTime,
-          exitTime: extracted.exitTime ?? f.exitTime,
-          direction: extracted.direction ?? f.direction,
-          result: extracted.result ?? f.result,
-          stopPoints: extracted.stopPoints != null ? String(extracted.stopPoints) : f.stopPoints,
-        }));
-      } catch (e) {
-        setMessage({ kind: "error", text: `AI extraction failed: ${e instanceof Error ? e.message : e}` });
-      } finally {
-        setExtracting(false);
-      }
-    }
-  }, [settings, autoExtract]);
+  }, []);
 
   // Allow pasting a screenshot anywhere on the page, not just inside the dropzone.
   useEffect(() => {
@@ -189,21 +163,9 @@ export default function TradeForm({ strategy, acceptPaste = true, initial, onDon
             previewUrl={screenshotDataUrl ?? storedShot.url}
             onFile={handleFile}
             onClear={clearScreenshot}
-            busy={extracting}
           />
         )}
         {storedShot.error && <span className="error-text">{storedShot.error}</span>}
-
-        {isAnthropicConfigured(settings) && (
-          <label className="bool-field" style={{ paddingBottom: 0, marginTop: 6 }}>
-            <input
-              type="checkbox"
-              checked={autoExtract}
-              onChange={(e) => setAutoExtract(e.target.checked)}
-            />
-            Read the screenshot with AI and fill the fields
-          </label>
-        )}
       </div>
 
       <div className="row" style={{ marginBottom: 10 }}>
@@ -274,7 +236,7 @@ export default function TradeForm({ strategy, acceptPaste = true, initial, onDon
       </div>
 
       <div className="row">
-        <button type="submit" className="primary" disabled={saving || extracting}>
+        <button type="submit" className="primary" disabled={saving}>
           {saving ? "Saving…" : isEdit ? "Save changes" : "Save trade"}
         </button>
         {isEdit && (

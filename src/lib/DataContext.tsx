@@ -17,6 +17,7 @@ import {
   type Trade,
 } from "./types";
 import { normalizeOpportunity, type Opportunity } from "./backtest";
+import { normalizeBacktestEntry, type BacktestEntry } from "./backtestEntry";
 import {
   normalizeStrategies,
   resolveSelection,
@@ -37,6 +38,7 @@ interface DataContextValue {
   trades: Trade[];
   dailyReviews: DailyReview[];
   opportunities: Opportunity[];
+  backtestEntries: BacktestEntry[];
   strategies: Strategy[];
   trash: TrashDoc;
   selectedIds: string[];
@@ -64,6 +66,9 @@ interface DataContextValue {
   saveBacktestScreenshot: (path: string, base64: string) => Promise<void>;
   saveBacktestHelper: (path: string, base64: string) => Promise<void>;
 
+  saveBacktestEntry: (e: BacktestEntry) => Promise<void>;
+  deleteBacktestEntry: (id: string) => Promise<void>;
+
   emptyTrashNow: () => Promise<void>;
 }
 
@@ -73,6 +78,7 @@ const TRADES_PATH = "data/trades.json";
 const REVIEWS_PATH = "data/daily-reviews.json";
 const RULES_PATH = "data/rules.json"; // legacy; seeds the first strategy
 const OPPORTUNITIES_PATH = "data/opportunities.json";
+const BACKTEST_ENTRIES_PATH = "data/backtest-entries.json";
 const STRATEGIES_PATH = "data/strategies.json";
 const TRASH_PATH = "data/trash.json";
 const SELECTION_KEY = "trading-dashboard-selected-strategies";
@@ -91,6 +97,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [dailyReviews, setDailyReviews] = useState<DailyReview[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [backtestEntries, setBacktestEntries] = useState<BacktestEntry[]>([]);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [trash, setTrash] = useState<TrashDoc>(emptyTrash);
   const [selectedRaw, setSelectedRaw] = useState<string[]>(() => loadSelection());
@@ -109,17 +116,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const [t, r, legacyRules, ops, strats, trashRaw] = await Promise.all([
+      const [t, r, legacyRules, ops, entries, strats, trashRaw] = await Promise.all([
         readJSON<Partial<Trade>[]>(settings, TRADES_PATH, []),
         readJSON<Partial<DailyReview>[]>(settings, REVIEWS_PATH, []),
         readJSON<Partial<RulesDoc> | null>(settings, RULES_PATH, null),
         readJSON<Partial<Opportunity>[]>(settings, OPPORTUNITIES_PATH, []),
+        readJSON<Partial<BacktestEntry>[]>(settings, BACKTEST_ENTRIES_PATH, []),
         readJSON<Partial<Strategy>[] | null>(settings, STRATEGIES_PATH, null),
         readJSON<Partial<TrashDoc> | null>(settings, TRASH_PATH, null),
       ]);
       setTrades(t.map(normalizeTrade));
       setDailyReviews(r.map(normalizeDailyReview));
       setOpportunities(ops.map(normalizeOpportunity));
+      setBacktestEntries(entries.map(normalizeBacktestEntry));
       setStrategies(normalizeStrategies(strats, legacyRules ?? undefined));
 
       const loadedTrash = normalizeTrash(trashRaw);
@@ -363,6 +372,38 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [settings],
   );
 
+  const persistBacktestEntries = useCallback(
+    async (next: BacktestEntry[], message: string) => {
+      setBacktestEntries(next);
+      await writeJSON(settings, BACKTEST_ENTRIES_PATH, next, message);
+    },
+    [settings],
+  );
+
+  const saveBacktestEntry = useCallback(
+    async (e: BacktestEntry) => {
+      const exists = backtestEntries.some((x) => x.id === e.id);
+      const next = (exists
+        ? backtestEntries.map((x) => (x.id === e.id ? e : x))
+        : [...backtestEntries, e]
+      ).sort((a, b) => a.seq - b.seq);
+      await persistBacktestEntries(next, `${exists ? "Update" : "Add"} backtest entry #${e.seq}`);
+    },
+    [backtestEntries, persistBacktestEntries],
+  );
+
+  const deleteBacktestEntry = useCallback(
+    async (id: string) => {
+      const target = backtestEntries.find((x) => x.id === id);
+      if (!target) return;
+      await persistBacktestEntries(
+        backtestEntries.filter((x) => x.id !== id),
+        `Delete backtest entry #${target.seq}`,
+      );
+    },
+    [backtestEntries, persistBacktestEntries],
+  );
+
   const value = useMemo<DataContextValue>(
     () => ({
       settings,
@@ -371,6 +412,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       trades,
       dailyReviews,
       opportunities,
+      backtestEntries,
       strategies,
       trash,
       selectedIds,
@@ -394,6 +436,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       purgeTrashedOpportunity,
       saveBacktestScreenshot,
       saveBacktestHelper,
+      saveBacktestEntry,
+      deleteBacktestEntry,
       emptyTrashNow,
     }),
     [
@@ -403,6 +447,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       trades,
       dailyReviews,
       opportunities,
+      backtestEntries,
       strategies,
       trash,
       selectedIds,
@@ -426,6 +471,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       purgeTrashedOpportunity,
       saveBacktestScreenshot,
       saveBacktestHelper,
+      saveBacktestEntry,
+      deleteBacktestEntry,
       emptyTrashNow,
     ],
   );

@@ -2,7 +2,6 @@ export interface AppSettings {
   githubToken: string;
   githubOwner: string;
   githubRepo: string;
-  anthropicKey: string;
 }
 
 const STORAGE_KEY = "trading-dashboard-settings";
@@ -11,7 +10,6 @@ export const emptySettings: AppSettings = {
   githubToken: "",
   githubOwner: "",
   githubRepo: "",
-  anthropicKey: "",
 };
 
 export function loadSettings(): AppSettings {
@@ -34,8 +32,4 @@ export function clearSettings(): void {
 
 export function isGithubConfigured(s: AppSettings): boolean {
   return Boolean(s.githubToken && s.githubOwner && s.githubRepo);
-}
-
-export function isAnthropicConfigured(s: AppSettings): boolean {
-  return Boolean(s.anthropicKey);
 }

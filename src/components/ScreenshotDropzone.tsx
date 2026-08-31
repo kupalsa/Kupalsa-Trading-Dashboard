@@ -30,7 +30,7 @@ export default function ScreenshotDropzone({ previewUrl, onFile, onClear, busy }
           <button type="button" onClick={onClear}>
             Remove screenshot
           </button>
-          {busy && <span className="muted">Extracting trade data…</span>}
+          {busy && <span className="muted">Uploading…</span>}
         </div>
       </div>
     );

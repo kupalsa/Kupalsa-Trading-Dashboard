@@ -104,6 +104,9 @@ export function normalizeTrade(raw: Partial<Trade>): Trade {
 }
 
 export function isAdherent(review: DailyReview): boolean {
+  // Standing down because there was no setup IS the strategy being followed —
+  // there was nothing to execute, so the execution checklist doesn't apply.
+  if (review.sessionOutcome === "No Trades — No Setup") return true;
   return Object.values(review.checklist).every(Boolean);
 }
 

@@ -893,6 +893,13 @@ th {
   overflow: auto;
 }
 
+/* The side column scrolls, so its panels must keep their natural height.
+   Letting them flex-shrink squashes the panel box while the tiles inside keep
+   their size, so the content spills outside the painted background. */
+.stats-side > .panel {
+  flex-shrink: 0;
+}
+
 @media (max-width: 900px) {
   .stats-body { grid-template-columns: 1fr; }
   .stats-page.fit { height: auto; overflow: visible; }
@@ -967,6 +974,104 @@ th {
   max-height: 80vh;
   border-radius: 3px;
   border: 1px solid var(--border);
+}
+
+/* --- Backtest entries --- */
+
+.backtest-entry {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-panel-2);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.backtest-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.backtest-seq {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  color: var(--text-dim);
+}
+
+.backtest-entry-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 820px) {
+  .backtest-entry-body { grid-template-columns: 1fr; }
+}
+
+.shot-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shot-cell {
+  position: relative;
+}
+
+.shot-thumb {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--bg-panel);
+  box-shadow: none;
+  display: block;
+  cursor: pointer;
+}
+
+.shot-thumb img {
+  display: block;
+  width: 108px;
+  height: 72px;
+  object-fit: cover;
+}
+
+.shot-remove {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+  border-radius: 50%;
+  border-color: var(--border);
+  background: var(--bg-panel);
+  color: var(--text-dim);
+}
+
+.shot-remove:hover:not(:disabled) {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.shot-add {
+  width: 108px;
+  height: 72px;
+  border-style: dashed;
+  font-size: 11px;
+  color: var(--text-dim);
+  box-shadow: none;
+}
+
+.backtest-text textarea {
+  min-height: 168px;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .helper-frame {

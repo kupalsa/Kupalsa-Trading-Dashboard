@@ -86,27 +86,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="panel">
-        <h2>Anthropic (screenshot extraction)</h2>
-        <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
-          Optional. Without a key, you can still log trades manually. Get a key at{" "}
-          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">
-            console.anthropic.com
-          </a>
-          .
-        </p>
-        <div className="field">
-          <label>Anthropic API key</label>
-          <input
-            type="password"
-            value={form.anthropicKey}
-            onChange={(e) => set("anthropicKey", e.target.value)}
-            placeholder="sk-ant-..."
-            style={{ minWidth: 320 }}
-          />
-        </div>
-      </div>
-
       <div className="row">
         <button className="primary" onClick={handleSave}>
           Save settings
