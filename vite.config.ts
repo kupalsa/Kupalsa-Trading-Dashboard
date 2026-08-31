@@ -8,9 +8,11 @@ export default defineConfig({
   // A fixed, non-fallback port keeps the dev server on the same origin every
   // run — localStorage (day state, selected strategy, theme) is scoped per
   // origin, so a silently different port would look like the app "forgot"
-  // everything on the next `npm run dev`.
+  // everything on the next `npm run dev`. PORT lets a host (e.g. an
+  // automation harness running its own preview alongside another one) assign
+  // a different fixed port instead; plain `npm run dev` still lands on 5173.
   server: {
-    port: 5173,
+    port: Number(process.env.PORT) || 5173,
     strictPort: true,
   },
 })
