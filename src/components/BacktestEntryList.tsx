@@ -28,7 +28,7 @@ function EntryCard({
   entry: BacktestEntry;
   onDelete: () => void;
 }) {
-  const { saveBacktestEntry, saveBacktestScreenshot } = useData();
+  const { saveBacktestEntry, saveBacktestScreenshot, removeBacktestScreenshot } = useData();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [text, setText] = useState(entry.text);
@@ -46,8 +46,7 @@ function EntryCard({
       const paths = [...entry.screenshotPaths];
       for (const file of Array.from(files)) {
         const compressed = await compressImage(file);
-        // Index by current length so re-adding after a removal can't collide.
-        const path = backtestEntryImagePath(entry.id, paths.length);
+        const path = backtestEntryImagePath(entry.id);
         await saveBacktestScreenshot(path, dataUrlToBase64(compressed));
         paths.push(path);
       }
@@ -68,6 +67,8 @@ function EntryCard({
         screenshotPaths: entry.screenshotPaths.filter((p) => p !== path),
         text,
       });
+      // Drop the reference first, then reclaim the blob.
+      await removeBacktestScreenshot(path);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

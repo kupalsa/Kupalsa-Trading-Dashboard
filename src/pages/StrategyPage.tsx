@@ -6,6 +6,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import type { SessionSchedule } from "../lib/session";
 import { STOP_FORMATS, type PlaybookStep, type Strategy, type StrategyDefinition } from "../lib/strategy";
 import { parseRTarget, projectedNetR, requiredWins } from "../lib/tradeTarget";
+import { useDirtyFlag } from "../lib/unsavedChanges";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -30,6 +31,10 @@ export default function StrategyPage() {
     setDraft(strategy ?? null);
     setSaved(false);
   }, [strategy]);
+
+  const dirty =
+    draft != null && strategy != null && JSON.stringify(draft) !== JSON.stringify(strategy);
+  useDirtyFlag(dirty);
 
   if (!githubReady) {
     return <div className="panel">Connect GitHub in Settings to edit strategies.</div>;
@@ -452,6 +457,7 @@ export default function StrategyPage() {
             {saving ? "Saving…" : "Save strategy"}
           </button>
           {saved && <span className="success-text">Saved</span>}
+          {dirty && !saving && <span className="warn-text">Unsaved changes</span>}
           {error && <span className="error-text">{error}</span>}
         </div>
 

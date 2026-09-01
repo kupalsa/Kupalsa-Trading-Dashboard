@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { loadSettings, saveSettings, isGithubConfigured, type AppSettings } from "./settings";
-import { readJSON, writeBinary, writeJSON } from "./githubStore";
+import { deleteFilesQuietly, readJSON, writeBinary, writeJSON } from "./githubStore";
 import {
   normalizeDailyReview,
   normalizeTrade,
@@ -19,6 +19,7 @@ import {
 import { normalizeOpportunity, type Opportunity } from "./backtest";
 import { normalizeBacktestEntry, type BacktestEntry } from "./backtestEntry";
 import {
+  backtestHelperPath,
   normalizeStrategies,
   resolveSelection,
   type Strategy,
@@ -64,6 +65,7 @@ interface DataContextValue {
   restoreOpportunity: (id: string) => Promise<void>;
   purgeTrashedOpportunity: (id: string) => Promise<void>;
   saveBacktestScreenshot: (path: string, base64: string) => Promise<void>;
+  removeBacktestScreenshot: (path: string) => Promise<void>;
   saveBacktestHelper: (path: string, base64: string) => Promise<void>;
 
   saveBacktestEntry: (e: BacktestEntry) => Promise<void>;
@@ -218,12 +220,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const purgeTrashedTrade = useCallback(
     async (id: string) => {
+      const target = trash.trades.find((x) => x.id === id);
       await persistTrash(
         { ...trash, trades: trash.trades.filter((x) => x.id !== id) },
         "Permanently delete trade",
       );
+      // Only a purge reclaims the image — a restore must keep it.
+      await deleteFilesQuietly(settings, [target?.screenshotPath], "Remove trade screenshot");
     },
-    [trash, persistTrash],
+    [trash, persistTrash, settings],
   );
 
   const saveScreenshot = useCallback(
@@ -275,8 +280,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
         `Delete strategy ${target?.name ?? id}`,
       );
       setSelectedIds(selectedIds.filter((x) => x !== id));
+      // Records stay, but the strategy's own assets have nothing left to
+      // belong to.
+      await deleteFilesQuietly(
+        settings,
+        [
+          ...(target?.playbook ?? []).map((step) => step.imagePath),
+          target ? backtestHelperPath(target.id) : null,
+        ],
+        `Remove assets for ${target?.name ?? id}`,
+      );
     },
-    [strategies, persistStrategies, selectedIds, setSelectedIds],
+    [strategies, persistStrategies, selectedIds, setSelectedIds, settings],
   );
 
   const savePlaybookImage = useCallback(
@@ -349,22 +364,39 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const purgeTrashedOpportunity = useCallback(
     async (id: string) => {
+      const target = trash.opportunities.find((x) => x.id === id);
       await persistTrash(
         { ...trash, opportunities: trash.opportunities.filter((x) => x.id !== id) },
         "Permanently delete opportunity",
       );
+      await deleteFilesQuietly(
+        settings,
+        (target?.screenshots ?? []).map((sh) => sh.path),
+        "Remove opportunity screenshot",
+      );
     },
-    [trash, persistTrash],
+    [trash, persistTrash, settings],
   );
 
-  const emptyTrashNow = useCallback(
-    async () => persistTrash(emptyTrash, "Empty trash"),
-    [persistTrash],
-  );
+  const emptyTrashNow = useCallback(async () => {
+    const paths = [
+      ...trash.trades.map((t) => t.screenshotPath),
+      ...trash.opportunities.flatMap((o) => (o.screenshots ?? []).map((sh) => sh.path)),
+    ];
+    await persistTrash(emptyTrash, "Empty trash");
+    await deleteFilesQuietly(settings, paths, "Remove screenshots for emptied trash");
+  }, [trash, persistTrash, settings]);
 
   const saveBacktestScreenshot = useCallback(
     async (path: string, base64: string) => {
       await writeBinary(settings, path, base64, "Add backtest screenshot");
+    },
+    [settings],
+  );
+
+  const removeBacktestScreenshot = useCallback(
+    async (path: string) => {
+      await deleteFilesQuietly(settings, [path], "Remove backtest screenshot");
     },
     [settings],
   );
@@ -404,8 +436,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         backtestEntries.filter((x) => x.id !== id),
         `Delete backtest entry #${target.seq}`,
       );
+      await deleteFilesQuietly(
+        settings,
+        target.screenshotPaths,
+        `Remove screenshots for backtest entry #${target.seq}`,
+      );
     },
-    [backtestEntries, persistBacktestEntries],
+    [backtestEntries, persistBacktestEntries, settings],
   );
 
   const value = useMemo<DataContextValue>(
@@ -439,6 +476,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       restoreOpportunity,
       purgeTrashedOpportunity,
       saveBacktestScreenshot,
+      removeBacktestScreenshot,
       saveBacktestHelper,
       saveBacktestEntry,
       deleteBacktestEntry,
@@ -474,6 +512,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       restoreOpportunity,
       purgeTrashedOpportunity,
       saveBacktestScreenshot,
+      removeBacktestScreenshot,
       saveBacktestHelper,
       saveBacktestEntry,
       deleteBacktestEntry,

@@ -62,7 +62,9 @@ export default function StatsPage() {
     .filter((s) => selectedIds.includes(s.id))
     .map((s) => s.name)
     .join(" + ");
-  const now = new Date();
+  // Stable for the life of the page: a fresh Date on every render
+  // invalidates every memo below it.
+  const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [fitMode, setFitMode] = useState(true);

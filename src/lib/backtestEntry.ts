@@ -37,6 +37,12 @@ export function newBacktestEntry(seq: number, strategyId: string): BacktestEntry
   };
 }
 
-export function backtestEntryImagePath(entryId: string, index: number): string {
-  return `backtest-entries/${entryId}-${index}.jpg`;
+/**
+ * Names each screenshot with its own id rather than a positional index.
+ * Indexing by the current count collides after a removal — drop the middle of
+ * three and the next upload reuses the last name, overwriting a screenshot
+ * that is still referenced.
+ */
+export function backtestEntryImagePath(entryId: string): string {
+  return `backtest-entries/${entryId}-${crypto.randomUUID()}.jpg`;
 }

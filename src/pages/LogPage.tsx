@@ -18,11 +18,11 @@ export default function LogPage() {
     [strategies, selectedIds],
   );
 
-  const now = new Date();
+  // Stable per mount so the memo below isn't invalidated on every render.
+  const now = useMemo(() => new Date(), []);
   const todays = useMemo(
     () => selected.filter((s) => isTradingDay(now, s.schedule)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selected, now.getDay()],
+    [selected, now],
   );
 
   if (!githubReady) {

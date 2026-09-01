@@ -128,6 +128,49 @@ export async function writeJSON<T>(
   await putFile(s, path, content, message, existing?.sha);
 }
 
+/**
+ * Remove a file from the repo. Used to reclaim screenshots when the record
+ * that referenced them is permanently destroyed — without this the repo only
+ * ever grows, and emptying the trash reclaims nothing.
+ *
+ * Deliberately forgiving: a file that is already gone is a success, not an
+ * error. These calls are cleanup that follows a record deletion which has
+ * already happened, so failing here must never surface as a failed delete.
+ */
+export async function deleteFile(
+  s: AppSettings,
+  path: string,
+  message: string,
+): Promise<void> {
+  const existing = await getFile(s, path);
+  if (!existing) return;
+  const res = await fetch(`${apiBase(s)}/${path}`, {
+    method: "DELETE",
+    headers: { ...headers(s), "Content-Type": "application/json" },
+    body: JSON.stringify({ message, sha: existing.sha }),
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new GithubApiError(`Could not delete ${path} (${res.status})`, res.status);
+  }
+  forgetRepoFile(s, path);
+}
+
+/** Best-effort cleanup of several files; never throws. */
+export async function deleteFilesQuietly(
+  s: AppSettings,
+  paths: (string | null | undefined)[],
+  message: string,
+): Promise<void> {
+  for (const path of paths) {
+    if (!path) continue;
+    try {
+      await deleteFile(s, path, message);
+    } catch {
+      // The record is already gone; an orphaned blob is not worth failing over.
+    }
+  }
+}
+
 /** Upload a binary (e.g. image) file given raw base64 content (no data: prefix). */
 export async function writeBinary(
   s: AppSettings,

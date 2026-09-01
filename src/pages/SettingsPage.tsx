@@ -2,9 +2,15 @@ import { useState } from "react";
 import { useData } from "../lib/DataContext";
 import { testConnection } from "../lib/githubStore";
 import type { AppSettings } from "../lib/settings";
+import {
+  downloadText,
+  reviewsToCsv,
+  stampedName,
+  tradesToCsv,
+} from "../lib/csv";
 
 export default function SettingsPage() {
-  const { settings, updateSettings, refresh } = useData();
+  const { settings, updateSettings, refresh, trades, dailyReviews, strategies } = useData();
   const [form, setForm] = useState<AppSettings>(settings);
   const [testStatus, setTestStatus] = useState<
     | { kind: "idle" }
@@ -113,6 +119,32 @@ export default function SettingsPage() {
             {testStatus.msg}
           </div>
         )}
+      </div>
+
+      <div className="panel">
+        <h2>Export</h2>
+        <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
+          Download a spreadsheet copy of your log. Your data already lives as JSON in your data
+          repo — this is for analysing it elsewhere.
+        </p>
+        <div className="row">
+          <button
+            onClick={() =>
+              downloadText(stampedName("trades", "csv"), tradesToCsv(trades, strategies))
+            }
+            disabled={trades.length === 0}
+          >
+            Trades CSV ({trades.length})
+          </button>
+          <button
+            onClick={() =>
+              downloadText(stampedName("daily-reviews", "csv"), reviewsToCsv(dailyReviews, strategies))
+            }
+            disabled={dailyReviews.length === 0}
+          >
+            Reviews CSV ({dailyReviews.length})
+          </button>
+        </div>
       </div>
 
       <div className="row">
