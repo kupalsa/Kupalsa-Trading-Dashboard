@@ -139,19 +139,47 @@ export async function writeBinary(
   await putFile(s, path, base64Content, message, existing?.sha);
 }
 
-export async function testConnection(s: AppSettings): Promise<string> {
+export interface ConnectionCheck {
+  fullName: string;
+  /** False when the token can read the repo but not write to it. */
+  canWrite: boolean;
+  private: boolean;
+}
+
+/**
+ * Reaching the repo is not the same as being able to save to it: a read-only
+ * token fetches this endpoint happily, then every write 404s (GitHub answers
+ * an unauthorised write with 404 rather than 403). The repo payload carries
+ * the granted permissions, so check `push` rather than reporting success on
+ * a bare 200.
+ */
+export async function testConnection(s: AppSettings): Promise<ConnectionCheck> {
   const res = await fetch(
     `https://api.github.com/repos/${s.githubOwner}/${s.githubRepo}`,
     { headers: headers(s) },
   );
   if (!res.ok) {
-    throw new GithubApiError(
-      `Could not reach repo (${res.status}): ${await res.text()}`,
-      res.status,
-    );
+    if (res.status === 404) {
+      throw new GithubApiError(
+        `No repository "${s.githubOwner}/${s.githubRepo}" is visible to this token. ` +
+          `Check the owner and repository names, and that the token grants access to this repo.`,
+        404,
+      );
+    }
+    if (res.status === 401) {
+      throw new GithubApiError(
+        "The token was rejected (401) — it has probably expired. Create a new one and paste it in.",
+        401,
+      );
+    }
+    throw new GithubApiError(`Could not reach repo (${res.status}): ${await res.text()}`, res.status);
   }
   const data = await res.json();
-  return data.full_name as string;
+  return {
+    fullName: data.full_name as string,
+    canWrite: Boolean(data.permissions?.push),
+    private: Boolean(data.private),
+  };
 }
 
 /**

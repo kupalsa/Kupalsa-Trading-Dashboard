@@ -1531,6 +1531,19 @@ textarea {
 .notice.warn {
   background: var(--bg-panel-2);
   border-left-color: var(--amber);
+  color: var(--amber);
+}
+
+.notice.ok {
+  background: var(--tint-green);
+  border-left-color: var(--green);
+  color: var(--green);
+}
+
+.notice.bad {
+  background: var(--tint-red);
+  border-left-color: var(--red);
+  color: var(--red);
 }
 
 .shot-list {

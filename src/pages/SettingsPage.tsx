@@ -7,7 +7,11 @@ export default function SettingsPage() {
   const { settings, updateSettings, refresh } = useData();
   const [form, setForm] = useState<AppSettings>(settings);
   const [testStatus, setTestStatus] = useState<
-    { kind: "idle" } | { kind: "testing" } | { kind: "ok"; msg: string } | { kind: "error"; msg: string }
+    | { kind: "idle" }
+    | { kind: "testing" }
+    | { kind: "ok"; msg: string }
+    | { kind: "readonly"; msg: string }
+    | { kind: "error"; msg: string }
   >({ kind: "idle" });
   const [saved, setSaved] = useState(false);
 
@@ -25,8 +29,20 @@ export default function SettingsPage() {
   async function handleTest() {
     setTestStatus({ kind: "testing" });
     try {
-      const fullName = await testConnection(form);
-      setTestStatus({ kind: "ok", msg: `Connected to ${fullName}` });
+      const check = await testConnection(form);
+      if (!check.canWrite) {
+        setTestStatus({
+          kind: "readonly",
+          msg:
+            `Reached ${check.fullName}, but this token is read-only — saving will fail. ` +
+            `Give it "Contents: Read and write" for this repository, then paste it again.`,
+        });
+        return;
+      }
+      setTestStatus({
+        kind: "ok",
+        msg: `Connected to ${check.fullName} with write access${check.private ? "" : " — note this repo is public"}.`,
+      });
     } catch (e) {
       setTestStatus({ kind: "error", msg: e instanceof Error ? e.message : String(e) });
     }
@@ -81,9 +97,22 @@ export default function SettingsPage() {
             Test connection
           </button>
           {testStatus.kind === "testing" && <span className="muted">Testing…</span>}
-          {testStatus.kind === "ok" && <span className="success-text">{testStatus.msg}</span>}
-          {testStatus.kind === "error" && <span className="error-text">{testStatus.msg}</span>}
         </div>
+        {testStatus.kind === "ok" && (
+          <div className="notice ok" style={{ marginTop: 12, marginBottom: 0 }}>
+            {testStatus.msg}
+          </div>
+        )}
+        {testStatus.kind === "readonly" && (
+          <div className="notice warn" style={{ marginTop: 12, marginBottom: 0 }}>
+            {testStatus.msg}
+          </div>
+        )}
+        {testStatus.kind === "error" && (
+          <div className="notice bad" style={{ marginTop: 12, marginBottom: 0 }}>
+            {testStatus.msg}
+          </div>
+        )}
       </div>
 
       <div className="row">
