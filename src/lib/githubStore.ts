@@ -74,11 +74,36 @@ async function putFile(
     }),
   });
   if (!res.ok) {
-    throw new GithubApiError(
-      `GitHub write failed (${res.status}) for ${path}: ${await res.text()}`,
-      res.status,
+    throw new GithubApiError(writeErrorMessage(res.status, path, await res.text()), res.status);
+  }
+}
+
+/**
+ * GitHub answers a write the token isn't allowed to make with 404 rather than
+ * 403 — it won't confirm the repo exists to a caller who can't write to it. So
+ * a 404 here almost always means the token's permissions, not a missing file:
+ * reading works while writing doesn't.
+ */
+function writeErrorMessage(status: number, path: string, body: string): string {
+  if (status === 404) {
+    return (
+      `Could not save ${path} — GitHub refused the write (404). ` +
+      `This usually means the Personal Access Token is missing "Contents: Read and write" ` +
+      `for this repository (read-only tokens can load your data but not save it). ` +
+      `Check the token at github.com/settings/tokens, then re-enter it in Settings. ` +
+      `Also confirm the owner and repository names are right.`
     );
   }
+  if (status === 401) {
+    return `Could not save ${path} — the token was rejected (401). It has probably expired; create a new one and re-enter it in Settings.`;
+  }
+  if (status === 409) {
+    return `Could not save ${path} — it changed in GitHub since this page loaded (409). Reload to pick up the newer version, then redo this change.`;
+  }
+  if (status === 403) {
+    return `Could not save ${path} — forbidden (403). If you have been saving rapidly this may be a rate limit; wait a minute and retry. Otherwise check the token's permissions.`;
+  }
+  return `GitHub write failed (${status}) for ${path}: ${body}`;
 }
 
 export async function readJSON<T>(

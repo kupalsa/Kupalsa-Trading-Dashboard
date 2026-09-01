@@ -161,16 +161,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const persistTrades = useCallback(
     async (next: Trade[]) => {
-      setTrades(next);
       await writeJSON(settings, TRADES_PATH, next, "Update trades.json");
+      setTrades(next);
     },
     [settings],
   );
 
   const persistTrash = useCallback(
     async (next: TrashDoc, message: string) => {
-      setTrash(next);
       await writeJSON(settings, TRASH_PATH, next, message);
+      setTrash(next);
     },
     [settings],
   );
@@ -190,11 +190,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       const target = trades.find((x) => x.id === id);
       if (!target) return;
-      await persistTrades(trades.filter((x) => x.id !== id));
+      // Copy into the trash BEFORE removing it. If the second write fails the
+      // trade exists in both places, which is recoverable; the other order
+      // would destroy it outright.
       await persistTrash(
         { ...trash, trades: [{ ...target, deletedAt: new Date().toISOString() }, ...trash.trades] },
         `Trash trade ${target.date}`,
       );
+      await persistTrades(trades.filter((x) => x.id !== id));
     },
     [trades, persistTrades, trash, persistTrash],
   );
@@ -237,16 +240,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ...dailyReviews.filter((x) => !(x.date === r.date && x.strategyId === r.strategyId)),
         r,
       ].sort((a, b) => a.date.localeCompare(b.date));
-      setDailyReviews(next);
       await writeJSON(settings, REVIEWS_PATH, next, `Update daily review ${r.date}`);
+      setDailyReviews(next);
     },
     [dailyReviews, settings],
   );
 
   const persistStrategies = useCallback(
     async (next: Strategy[], message: string) => {
-      setStrategies(next);
       await writeJSON(settings, STRATEGIES_PATH, next, message);
+      setStrategies(next);
     },
     [settings],
   );
@@ -285,8 +288,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const persistOpportunities = useCallback(
     async (next: Opportunity[], message: string) => {
-      setOpportunities(next);
       await writeJSON(settings, OPPORTUNITIES_PATH, next, message);
+      setOpportunities(next);
     },
     [settings],
   );
@@ -311,16 +314,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       const target = opportunities.find((x) => x.id === id);
       if (!target) return;
-      await persistOpportunities(
-        opportunities.filter((x) => x.id !== id),
-        `Delete opportunity #${target.seq}`,
-      );
+      // Trash first, then remove — see deleteTrade.
       await persistTrash(
         {
           ...trash,
           opportunities: [{ ...target, deletedAt: new Date().toISOString() }, ...trash.opportunities],
         },
         `Trash opportunity #${target.seq}`,
+      );
+      await persistOpportunities(
+        opportunities.filter((x) => x.id !== id),
+        `Delete opportunity #${target.seq}`,
       );
     },
     [opportunities, persistOpportunities, trash, persistTrash],
@@ -374,8 +378,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const persistBacktestEntries = useCallback(
     async (next: BacktestEntry[], message: string) => {
-      setBacktestEntries(next);
       await writeJSON(settings, BACKTEST_ENTRIES_PATH, next, message);
+      setBacktestEntries(next);
     },
     [settings],
   );

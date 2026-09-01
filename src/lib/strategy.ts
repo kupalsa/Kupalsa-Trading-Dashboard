@@ -52,6 +52,19 @@ export const emptyDefinition: StrategyDefinition = {
 
 export const STOP_FORMATS = ["Pts.", "%", "$", "Ticks"] as const;
 
+export type TargetCadence = "month" | "week";
+
+/**
+ * How many trades this strategy aims to take per period — the "trade slots"
+ * idea: decide up front how many your edge actually supports, then weigh each
+ * entry against "is this one of my best N?" Purely informational; logging past
+ * the target is never blocked.
+ */
+export interface TradeTarget {
+  cadence: TargetCadence;
+  count: number;
+}
+
 export interface Strategy {
   id: string;
   name: string;
@@ -61,6 +74,7 @@ export interface Strategy {
   strategyNotes: string;
   playbook: PlaybookStep[];
   createdAt: string;
+  tradeTarget: TradeTarget | null;
 }
 
 /** Records written before strategies existed belong to this one. */
@@ -76,6 +90,7 @@ export function newStrategy(name: string): Strategy {
     strategyNotes: "",
     playbook: [],
     createdAt: new Date().toISOString(),
+    tradeTarget: null,
   };
 }
 
@@ -92,7 +107,23 @@ function normalizeStep(raw: Partial<PlaybookStep>): PlaybookStep {
   };
 }
 
-export function normalizeStrategy(raw: Partial<Strategy>): Strategy {
+/** Accepts the earlier `monthlyTradeLimit` shape so existing records migrate. */
+function normalizeTradeTarget(
+  raw: Partial<Strategy> & { monthlyTradeLimit?: number | null },
+): TradeTarget | null {
+  const t = raw.tradeTarget;
+  if (t && typeof t.count === "number" && t.count > 0) {
+    return { cadence: t.cadence === "week" ? "week" : "month", count: Math.floor(t.count) };
+  }
+  if (typeof raw.monthlyTradeLimit === "number" && raw.monthlyTradeLimit > 0) {
+    return { cadence: "month", count: Math.floor(raw.monthlyTradeLimit) };
+  }
+  return null;
+}
+
+export function normalizeStrategy(
+  raw: Partial<Strategy> & { monthlyTradeLimit?: number | null },
+): Strategy {
   return {
     id: raw.id ?? crypto.randomUUID(),
     name: raw.name?.trim() || "Untitled strategy",
@@ -102,6 +133,7 @@ export function normalizeStrategy(raw: Partial<Strategy>): Strategy {
     strategyNotes: raw.strategyNotes ?? "",
     playbook: (raw.playbook ?? []).map(normalizeStep),
     createdAt: raw.createdAt ?? new Date().toISOString(),
+    tradeTarget: normalizeTradeTarget(raw),
   };
 }
 

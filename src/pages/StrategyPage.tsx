@@ -5,6 +5,7 @@ import PlaybookEditor from "../components/PlaybookEditor";
 import ConfirmDialog from "../components/ConfirmDialog";
 import type { SessionSchedule } from "../lib/session";
 import { STOP_FORMATS, type PlaybookStep, type Strategy, type StrategyDefinition } from "../lib/strategy";
+import { parseRTarget, projectedNetR, requiredWins } from "../lib/tradeTarget";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -204,6 +205,87 @@ export default function StrategyPage() {
                 Times should run in order: open, then entry close, then market close.
               </div>
             )}
+          </div>
+
+          <div className="panel">
+            <h2>Trade target</h2>
+            <p className="small-note" style={{ marginTop: 0 }}>
+              How many trades this strategy's edge actually supports per period. The Log page turns
+              this into a row of slots showing where you stand and how many still need to win — a
+              visual guide only, logging past it is never blocked.
+            </p>
+
+            <div className="row" style={{ alignItems: "flex-end" }}>
+              <div className="field">
+                <label>Per</label>
+                <div className="toggle-group">
+                  {(["month", "week"] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={draft.tradeTarget?.cadence === c ? "active" : ""}
+                      onClick={() =>
+                        set("tradeTarget", {
+                          cadence: c,
+                          count: draft.tradeTarget?.count ?? (c === "month" ? 10 : 3),
+                        })
+                      }
+                    >
+                      {c === "month" ? "Month" : "Week"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="field" style={{ maxWidth: 140 }}>
+                <label>Trades</label>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="Not set"
+                  value={draft.tradeTarget?.count ?? ""}
+                  onChange={(e) =>
+                    set(
+                      "tradeTarget",
+                      e.target.value === ""
+                        ? null
+                        : {
+                            cadence: draft.tradeTarget?.cadence ?? "month",
+                            count: Number(e.target.value),
+                          },
+                    )
+                  }
+                />
+              </div>
+
+              {draft.tradeTarget && (
+                <button type="button" onClick={() => set("tradeTarget", null)}>
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {draft.tradeTarget &&
+              (() => {
+                const r = parseRTarget(draft.definition.minimalRTarget);
+                const need = requiredWins(draft.tradeTarget.count, r);
+                if (need === null) {
+                  return (
+                    <div className="notice warn" style={{ marginTop: 12, marginBottom: 0 }}>
+                      Set a <strong>Minimal R target</strong> under Take profit to work out how many of
+                      these need to win.
+                    </div>
+                  );
+                }
+                return (
+                  <div className="notice" style={{ marginTop: 12, marginBottom: 0 }}>
+                    At {r}R per win and −1R per loss, <strong>{need}</strong> of{" "}
+                    {draft.tradeTarget.count} need to win to finish profitable — that would be{" "}
+                    {projectedNetR(draft.tradeTarget.count, r!, need) > 0 ? "+" : ""}
+                    {projectedNetR(draft.tradeTarget.count, r!, need).toFixed(0)}R.
+                  </div>
+                );
+              })()}
           </div>
 
           <div className="panel">

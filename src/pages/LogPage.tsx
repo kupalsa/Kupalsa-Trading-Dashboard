@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useData } from "../lib/DataContext";
 import { isTradingDay } from "../lib/session";
 import LiveSessionPanel from "../components/LiveSessionPanel";
+import TradeTargetBoard from "../components/TradeTargetBoard";
 import TradeForm from "../components/TradeForm";
 import TradeTable from "../components/TradeTable";
 import DailyReviewPanel from "../components/DailyReviewPanel";
@@ -77,6 +78,7 @@ export default function LogPage() {
               </div>
             )}
             {isTradingDay(now, s.schedule) && <LiveSessionPanel strategy={s} />}
+            <TradeTargetBoard strategy={s} />
             <TradeForm strategy={s} acceptPaste={activePaste === s.id} />
             <DailyReviewPanel strategy={s} />
           </section>

@@ -1101,6 +1101,111 @@ textarea {
   accent-color: var(--accent);
 }
 
+/* --- Trade target board --- */
+
+.trade-target {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px 16px 13px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.trade-target-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+
+.trade-target-title {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+
+.trade-target-count {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.tt-pos { color: var(--green); }
+.tt-neg { color: var(--red); }
+
+.trade-target-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* Each slot is one trade the plan allows for. Empty slots are quiet; the ones
+   that still have to win to finish the period green are outlined. */
+/* Fixed width rather than flex-grow: a row of 10 then wraps evenly instead of
+   stretching to fill and orphaning the last slot on its own line. */
+.tt-slot {
+  flex: 0 0 auto;
+  width: 58px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 3px;
+  background: var(--bg-panel-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.tt-slot.target {
+  border-style: dashed;
+  border-color: var(--green);
+  background: var(--tint-green);
+  color: var(--green);
+  font-weight: 600;
+}
+
+.tt-slot.filled {
+  border-style: solid;
+  font-weight: 600;
+}
+
+.tt-slot.filled.win {
+  border-color: var(--green);
+  background: var(--tint-green);
+  color: var(--green);
+}
+
+.tt-slot.filled.loss {
+  border-color: var(--red);
+  background: var(--tint-red);
+  color: var(--red);
+}
+
+.tt-slot.filled.be {
+  border-color: var(--border);
+  color: var(--amber);
+}
+
+/* Trades taken beyond the plan sit apart so going over is visible. */
+.tt-slot.over {
+  opacity: 0.75;
+  border-style: dotted;
+}
+
+.trade-target-note {
+  margin-top: 9px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
 /* --- Live session panel --- */
 
 .live-panel {
