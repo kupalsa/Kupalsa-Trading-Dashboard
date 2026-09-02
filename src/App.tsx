@@ -5,6 +5,7 @@ import { applyTheme, loadTheme, type Theme } from "./lib/theme";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsavedChanges";
 import ConfirmDialog from "./components/ConfirmDialog";
 import SessionReminder from "./components/SessionReminder";
+import UpdateNotice from "./components/UpdateNotice";
 import StrategyPicker from "./components/StrategyPicker";
 import LogPage from "./pages/LogPage";
 import StatsPage from "./pages/StatsPage";
@@ -115,6 +116,7 @@ function AppShell() {
       </div>
       <SessionReminder />
       <LeaveGuard />
+      <UpdateNotice />
     </div>
   );
 }
