@@ -7,7 +7,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { loadSettings, saveSettings, isGithubConfigured, type AppSettings } from "./settings";
+import {
+  loadSettings,
+  normalizeSettings,
+  saveSettings,
+  isGithubConfigured,
+  type AppSettings,
+} from "./settings";
 import { deleteFilesQuietly, readJSON, writeBinary, writeJSON } from "./githubStore";
 import {
   normalizeDailyReview,
@@ -109,8 +115,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const githubReady = isGithubConfigured(settings);
 
   const updateSettings = useCallback((s: AppSettings) => {
-    setSettings(s);
-    saveSettings(s);
+    // Trim here too: in-memory settings drive the API calls, so a stray space
+    // would keep failing until the next reload picked up the stored version.
+    const clean = normalizeSettings(s);
+    setSettings(clean);
+    saveSettings(clean);
   }, []);
 
   const refresh = useCallback(async () => {

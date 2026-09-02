@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useData } from "../lib/DataContext";
 import { testConnection } from "../lib/githubStore";
-import type { AppSettings } from "../lib/settings";
+import { normalizeSettings, type AppSettings } from "../lib/settings";
 import {
   downloadText,
   reviewsToCsv,
@@ -27,7 +27,11 @@ export default function SettingsPage() {
   }
 
   function handleSave() {
-    updateSettings(form);
+    // Reflect the cleaned values back into the form so the user sees what was
+    // actually stored.
+    const clean = normalizeSettings(form);
+    setForm(clean);
+    updateSettings(clean);
     setSaved(true);
     setTimeout(() => refresh(), 100);
   }
@@ -35,7 +39,7 @@ export default function SettingsPage() {
   async function handleTest() {
     setTestStatus({ kind: "testing" });
     try {
-      const check = await testConnection(form);
+      const check = await testConnection(normalizeSettings(form));
       if (!check.canWrite) {
         setTestStatus({
           kind: "readonly",
