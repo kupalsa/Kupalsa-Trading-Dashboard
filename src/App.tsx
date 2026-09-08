@@ -3,6 +3,8 @@ import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { DataProvider, useData } from "./lib/DataContext";
 import { applyTheme, loadTheme, type Theme } from "./lib/theme";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsavedChanges";
+import { ActiveTimerProvider, useActiveTimer } from "./lib/activeTimer";
+import { formatDuration, isRunning, sessionMs } from "./lib/timeTracking";
 import ConfirmDialog from "./components/ConfirmDialog";
 import SessionReminder from "./components/SessionReminder";
 import UpdateNotice from "./components/UpdateNotice";
@@ -13,6 +15,7 @@ import StrategyPage from "./pages/StrategyPage";
 import BacktestPage from "./pages/BacktestPage";
 import SettingsPage from "./pages/SettingsPage";
 import TrashPage from "./pages/TrashPage";
+import TimePage from "./pages/TimePage";
 
 /** A nav link that asks before abandoning unsaved edits. */
 function GuardedLink({
@@ -43,6 +46,20 @@ function GuardedLink({
   );
 }
 
+/** Visible on every page so a running timer can't be forgotten. */
+function TimerBadge() {
+  const { active, now } = useActiveTimer();
+  if (!active) return null;
+  const live = isRunning(active);
+  return (
+    <NavLink to="/time" className={live ? "timer-badge running" : "timer-badge"}>
+      <span className="timer-dot" />
+      {active.category} {formatDuration(sessionMs(active, now))}
+      {!live && <span className="small-note"> paused</span>}
+    </NavLink>
+  );
+}
+
 function Sidebar() {
   const { githubReady, trash } = useData();
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
@@ -62,11 +79,13 @@ function Sidebar() {
       <GuardedLink to="/stats">Stats</GuardedLink>
       <GuardedLink to="/strategy">Strategy</GuardedLink>
       <GuardedLink to="/backtest">Backtest</GuardedLink>
+      <GuardedLink to="/time">Time</GuardedLink>
       <GuardedLink to="/settings">
         Settings {!githubReady && <span style={{ color: "var(--amber)" }}>●</span>}
       </GuardedLink>
 
       <div className="sidebar-footer">
+        <TimerBadge />
         <GuardedLink
           to="/trash"
           className={({ isActive }) => `trash-link${isActive ? " active" : ""}`}
@@ -111,6 +130,7 @@ function AppShell() {
           <Route path="/strategy/:id" element={<StrategyPage />} />
           <Route path="/backtest" element={<BacktestPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/time" element={<TimePage />} />
           <Route path="/trash" element={<TrashPage />} />
         </Routes>
       </div>
@@ -125,7 +145,9 @@ export default function App() {
   return (
     <DataProvider>
       <UnsavedChangesProvider>
-        <AppShell />
+        <ActiveTimerProvider>
+          <AppShell />
+        </ActiveTimerProvider>
       </UnsavedChangesProvider>
     </DataProvider>
   );

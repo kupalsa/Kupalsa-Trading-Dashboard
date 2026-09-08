@@ -24,6 +24,7 @@ import {
 } from "./types";
 import { normalizeOpportunity, type Opportunity } from "./backtest";
 import { normalizeBacktestEntry, type BacktestEntry } from "./backtestEntry";
+import { emptyTimeDoc, normalizeTimeDoc, type TimeDoc, type TimeSession } from "./timeTracking";
 import {
   backtestHelperPath,
   normalizeStrategies,
@@ -46,6 +47,7 @@ interface DataContextValue {
   dailyReviews: DailyReview[];
   opportunities: Opportunity[];
   backtestEntries: BacktestEntry[];
+  timeDoc: TimeDoc;
   strategies: Strategy[];
   trash: TrashDoc;
   selectedIds: string[];
@@ -77,6 +79,10 @@ interface DataContextValue {
   saveBacktestEntry: (e: BacktestEntry) => Promise<void>;
   deleteBacktestEntry: (id: string) => Promise<void>;
 
+  saveTimeSession: (s: TimeSession) => Promise<void>;
+  deleteTimeSession: (id: string) => Promise<void>;
+  addTimeCategory: (name: string) => Promise<void>;
+
   emptyTrashNow: () => Promise<void>;
 }
 
@@ -87,6 +93,7 @@ const REVIEWS_PATH = "data/daily-reviews.json";
 const RULES_PATH = "data/rules.json"; // legacy; seeds the first strategy
 const OPPORTUNITIES_PATH = "data/opportunities.json";
 const BACKTEST_ENTRIES_PATH = "data/backtest-entries.json";
+const TIME_PATH = "data/time-sessions.json";
 const STRATEGIES_PATH = "data/strategies.json";
 const TRASH_PATH = "data/trash.json";
 const SELECTION_KEY = "trading-dashboard-selected-strategies";
@@ -106,6 +113,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [dailyReviews, setDailyReviews] = useState<DailyReview[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [backtestEntries, setBacktestEntries] = useState<BacktestEntry[]>([]);
+  const [timeDoc, setTimeDoc] = useState<TimeDoc>(emptyTimeDoc);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [trash, setTrash] = useState<TrashDoc>(emptyTrash);
   const [selectedRaw, setSelectedRaw] = useState<string[]>(() => loadSelection());
@@ -127,7 +135,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const [t, r, legacyRules, ops, entries, strats, trashRaw] = await Promise.all([
+      const [t, r, legacyRules, ops, entries, strats, trashRaw, timeRaw] = await Promise.all([
         readJSON<Partial<Trade>[]>(settings, TRADES_PATH, []),
         readJSON<Partial<DailyReview>[]>(settings, REVIEWS_PATH, []),
         readJSON<Partial<RulesDoc> | null>(settings, RULES_PATH, null),
@@ -135,11 +143,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         readJSON<Partial<BacktestEntry>[]>(settings, BACKTEST_ENTRIES_PATH, []),
         readJSON<Partial<Strategy>[] | null>(settings, STRATEGIES_PATH, null),
         readJSON<Partial<TrashDoc> | null>(settings, TRASH_PATH, null),
+        readJSON<Partial<TimeDoc> | null>(settings, TIME_PATH, null),
       ]);
       setTrades(t.map(normalizeTrade));
       setDailyReviews(r.map(normalizeDailyReview));
       setOpportunities(ops.map(normalizeOpportunity));
       setBacktestEntries(entries.map(normalizeBacktestEntry));
+      setTimeDoc(normalizeTimeDoc(timeRaw));
       setStrategies(normalizeStrategies(strats, legacyRules ?? undefined));
 
       const loadedTrash = normalizeTrash(trashRaw);
@@ -454,6 +464,57 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [backtestEntries, persistBacktestEntries, settings],
   );
 
+  const persistTimeDoc = useCallback(
+    async (next: TimeDoc, message: string) => {
+      await writeJSON(settings, TIME_PATH, next, message);
+      setTimeDoc(next);
+    },
+    [settings],
+  );
+
+  const saveTimeSession = useCallback(
+    async (session: TimeSession) => {
+      const exists = timeDoc.sessions.some((x) => x.id === session.id);
+      const sessions = exists
+        ? timeDoc.sessions.map((x) => (x.id === session.id ? session : x))
+        : [...timeDoc.sessions, session];
+      // A category used by a session must exist in the list, even if the
+      // session arrived from another device that added it.
+      const categories = timeDoc.categories.includes(session.category)
+        ? timeDoc.categories
+        : [...timeDoc.categories, session.category];
+      await persistTimeDoc(
+        { categories, sessions },
+        `${exists ? "Update" : "Log"} ${session.category} session`,
+      );
+    },
+    [timeDoc, persistTimeDoc],
+  );
+
+  const deleteTimeSession = useCallback(
+    async (id: string) => {
+      const target = timeDoc.sessions.find((x) => x.id === id);
+      if (!target) return;
+      await persistTimeDoc(
+        { ...timeDoc, sessions: timeDoc.sessions.filter((x) => x.id !== id) },
+        `Delete ${target.category} session`,
+      );
+    },
+    [timeDoc, persistTimeDoc],
+  );
+
+  const addTimeCategory = useCallback(
+    async (name: string) => {
+      const clean = name.trim();
+      if (!clean || timeDoc.categories.includes(clean)) return;
+      await persistTimeDoc(
+        { ...timeDoc, categories: [...timeDoc.categories, clean] },
+        `Add time category ${clean}`,
+      );
+    },
+    [timeDoc, persistTimeDoc],
+  );
+
   const value = useMemo<DataContextValue>(
     () => ({
       settings,
@@ -463,6 +524,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dailyReviews,
       opportunities,
       backtestEntries,
+      timeDoc,
       strategies,
       trash,
       selectedIds,
@@ -489,6 +551,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       saveBacktestHelper,
       saveBacktestEntry,
       deleteBacktestEntry,
+      saveTimeSession,
+      deleteTimeSession,
+      addTimeCategory,
       emptyTrashNow,
     }),
     [
@@ -499,6 +564,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dailyReviews,
       opportunities,
       backtestEntries,
+      timeDoc,
       strategies,
       trash,
       selectedIds,
@@ -525,6 +591,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       saveBacktestHelper,
       saveBacktestEntry,
       deleteBacktestEntry,
+      saveTimeSession,
+      deleteTimeSession,
+      addTimeCategory,
       emptyTrashNow,
     ],
   );
