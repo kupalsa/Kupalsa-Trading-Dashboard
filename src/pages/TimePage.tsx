@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useData } from "../lib/DataContext";
 import { useActiveTimer } from "../lib/activeTimer";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { formatDate } from "../lib/stats";
+import { buildCalendarWeeks, formatDate } from "../lib/stats";
 import {
   discardOpenSegment,
   finish,
@@ -34,6 +34,69 @@ function segmentRanges(session: TimeSession): string {
   return session.segments
     .map((s) => `${clockTime(s.start)}–${s.end ? clockTime(s.end) : "…"}`)
     .join(", ");
+}
+
+/**
+ * The month as a heat grid: each day shaded by how much time it holds, so a
+ * glance shows the rhythm of the work rather than just its total. Shading is
+ * relative to the busiest day of the month, which keeps a light month
+ * readable instead of uniformly pale.
+ */
+function TimeCalendar({
+  perDay,
+  year,
+  month,
+  today,
+}: {
+  perDay: Map<string, number>;
+  year: number;
+  month: number;
+  today: string;
+}) {
+  const weeks = buildCalendarWeeks(year, month);
+  const prefix = `${year}-${String(month).padStart(2, "0")}`;
+  const busiestDay = Math.max(
+    0,
+    ...[...perDay.entries()].filter(([d]) => d.startsWith(prefix)).map(([, ms]) => ms),
+  );
+
+  return (
+    <div className="calendar">
+      <div className="calendar-header">
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+          <div key={d}>{d}</div>
+        ))}
+      </div>
+      {weeks.map((week, wi) => (
+        <div className="calendar-week" key={wi}>
+          {week.map((date, di) => {
+            if (!date) return <div className="day-cell empty" key={di} />;
+            const ms = perDay.get(date) ?? 0;
+            const classes = ["day-cell", "time-day"];
+            if (di >= 5) classes.push("weekend");
+            if (date === today) classes.push("today");
+            if (ms > 0) classes.push("has-time");
+            return (
+              <div
+                className={classes.join(" ")}
+                key={di}
+                // Floor keeps the lightest day visible rather than invisible.
+                style={
+                  ms > 0 && busiestDay > 0
+                    ? { ["--fill" as string]: String(0.18 + (ms / busiestDay) * 0.82) }
+                    : undefined
+                }
+                title={ms > 0 ? `${date} — ${formatHours(ms)}` : date}
+              >
+                <div className="date-num">{Number(date.split("-")[2])}</div>
+                {ms > 0 && <div className="time-day-value">{formatHours(ms)}</div>}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function TimePage() {
@@ -75,10 +138,10 @@ export default function TimePage() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [timeDoc.sessions, year, month]);
 
-  const todayMs = useMemo(
-    () => msByDay(timeDoc.sessions, now).get(formatDate(now)) ?? 0,
-    [timeDoc.sessions, now],
-  );
+  // Saved sessions only, like the summary — the running timer has its own
+  // readout, and showing unsaved time as logged would misrepresent it.
+  const perDay = useMemo(() => msByDay(timeDoc.sessions, now), [timeDoc.sessions, now]);
+  const todayMs = perDay.get(formatDate(now)) ?? 0;
 
   function shiftMonth(delta: number) {
     let m = month + delta;
@@ -290,6 +353,16 @@ export default function TimePage() {
             ))}
           </>
         )}
+      </div>
+
+      <div className="panel">
+        <h2>
+          Calendar
+          <span className="small-note" style={{ marginLeft: "auto" }}>
+            {MONTH_NAMES[month - 1]} {year}
+          </span>
+        </h2>
+        <TimeCalendar perDay={perDay} year={year} month={month} today={formatDate(now)} />
       </div>
 
       <div className="panel">

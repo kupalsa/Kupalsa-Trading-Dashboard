@@ -62,8 +62,12 @@ function TimerBadge() {
 
 function Sidebar() {
   const { githubReady, trash } = useData();
+  const { active } = useActiveTimer();
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
   const trashCount = trash.trades.length + trash.opportunities.length;
+  // Pulsing only while actually counting; a paused session shows a still dot,
+  // so "open" and "running" don't look the same.
+  const timerLive = active != null && isRunning(active);
 
   useEffect(() => {
     applyTheme(theme);
@@ -79,7 +83,10 @@ function Sidebar() {
       <GuardedLink to="/stats">Stats</GuardedLink>
       <GuardedLink to="/strategy">Strategy</GuardedLink>
       <GuardedLink to="/backtest">Backtest</GuardedLink>
-      <GuardedLink to="/time">Time</GuardedLink>
+      <GuardedLink to="/time">
+        Time
+        {active && <span className={timerLive ? "nav-dot live" : "nav-dot"} />}
+      </GuardedLink>
       <GuardedLink to="/settings">
         Settings {!githubReady && <span style={{ color: "var(--amber)" }}>●</span>}
       </GuardedLink>
