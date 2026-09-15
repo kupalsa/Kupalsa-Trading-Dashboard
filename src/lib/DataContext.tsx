@@ -24,6 +24,7 @@ import {
 } from "./types";
 import { normalizeOpportunity, type Opportunity } from "./backtest";
 import { normalizeBacktestEntry, type BacktestEntry } from "./backtestEntry";
+import { normalizeBacktestSetup, type BacktestSetup } from "./backtestSetup";
 import { emptyTimeDoc, normalizeTimeDoc, type TimeDoc, type TimeSession } from "./timeTracking";
 import {
   backtestHelperPath,
@@ -47,6 +48,7 @@ interface DataContextValue {
   dailyReviews: DailyReview[];
   opportunities: Opportunity[];
   backtestEntries: BacktestEntry[];
+  backtestSetups: BacktestSetup[];
   timeDoc: TimeDoc;
   strategies: Strategy[];
   trash: TrashDoc;
@@ -74,10 +76,12 @@ interface DataContextValue {
   purgeTrashedOpportunity: (id: string) => Promise<void>;
   saveBacktestScreenshot: (path: string, base64: string) => Promise<void>;
   removeBacktestScreenshot: (path: string) => Promise<void>;
-  saveBacktestHelper: (path: string, base64: string) => Promise<void>;
 
   saveBacktestEntry: (e: BacktestEntry) => Promise<void>;
   deleteBacktestEntry: (id: string) => Promise<void>;
+
+  saveBacktestSetup: (s: BacktestSetup) => Promise<void>;
+  deleteBacktestSetup: (id: string) => Promise<void>;
 
   saveTimeSession: (s: TimeSession) => Promise<void>;
   deleteTimeSession: (id: string) => Promise<void>;
@@ -93,6 +97,7 @@ const REVIEWS_PATH = "data/daily-reviews.json";
 const RULES_PATH = "data/rules.json"; // legacy; seeds the first strategy
 const OPPORTUNITIES_PATH = "data/opportunities.json";
 const BACKTEST_ENTRIES_PATH = "data/backtest-entries.json";
+const BACKTEST_SETUPS_PATH = "data/backtest-setups.json";
 const TIME_PATH = "data/time-sessions.json";
 const STRATEGIES_PATH = "data/strategies.json";
 const TRASH_PATH = "data/trash.json";
@@ -113,6 +118,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [dailyReviews, setDailyReviews] = useState<DailyReview[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [backtestEntries, setBacktestEntries] = useState<BacktestEntry[]>([]);
+  const [backtestSetups, setBacktestSetups] = useState<BacktestSetup[]>([]);
   const [timeDoc, setTimeDoc] = useState<TimeDoc>(emptyTimeDoc);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [trash, setTrash] = useState<TrashDoc>(emptyTrash);
@@ -135,12 +141,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const [t, r, legacyRules, ops, entries, strats, trashRaw, timeRaw] = await Promise.all([
+      const [t, r, legacyRules, ops, entries, setups, strats, trashRaw, timeRaw] = await Promise.all([
         readJSON<Partial<Trade>[]>(settings, TRADES_PATH, []),
         readJSON<Partial<DailyReview>[]>(settings, REVIEWS_PATH, []),
         readJSON<Partial<RulesDoc> | null>(settings, RULES_PATH, null),
         readJSON<Partial<Opportunity>[]>(settings, OPPORTUNITIES_PATH, []),
         readJSON<Partial<BacktestEntry>[]>(settings, BACKTEST_ENTRIES_PATH, []),
+        readJSON<Partial<BacktestSetup>[]>(settings, BACKTEST_SETUPS_PATH, []),
         readJSON<Partial<Strategy>[] | null>(settings, STRATEGIES_PATH, null),
         readJSON<Partial<TrashDoc> | null>(settings, TRASH_PATH, null),
         readJSON<Partial<TimeDoc> | null>(settings, TIME_PATH, null),
@@ -149,6 +156,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setDailyReviews(r.map(normalizeDailyReview));
       setOpportunities(ops.map(normalizeOpportunity));
       setBacktestEntries(entries.map(normalizeBacktestEntry));
+      setBacktestSetups(setups.map(normalizeBacktestSetup));
       setTimeDoc(normalizeTimeDoc(timeRaw));
       setStrategies(normalizeStrategies(strats, legacyRules ?? undefined));
 
@@ -420,11 +428,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [settings],
   );
 
-  const saveBacktestHelper = useCallback(
-    async (path: string, base64: string) => {
-      await writeBinary(settings, path, base64, "Update backtest helper tool");
+  const persistBacktestSetups = useCallback(
+    async (next: BacktestSetup[], message: string) => {
+      await writeJSON(settings, BACKTEST_SETUPS_PATH, next, message);
+      setBacktestSetups(next);
     },
     [settings],
+  );
+
+  const saveBacktestSetup = useCallback(
+    async (s: BacktestSetup) => {
+      const exists = backtestSetups.some((x) => x.id === s.id);
+      const next = exists
+        ? backtestSetups.map((x) => (x.id === s.id ? s : x))
+        : [...backtestSetups, s];
+      await persistBacktestSetups(next, `${exists ? "Update" : "Add"} backtest setup ${s.name}`);
+    },
+    [backtestSetups, persistBacktestSetups],
+  );
+
+  const deleteBacktestSetup = useCallback(
+    async (id: string) => {
+      const target = backtestSetups.find((x) => x.id === id);
+      await persistBacktestSetups(
+        backtestSetups.filter((x) => x.id !== id),
+        `Delete backtest setup ${target?.name ?? id}`,
+      );
+    },
+    [backtestSetups, persistBacktestSetups],
   );
 
   const persistBacktestEntries = useCallback(
@@ -524,6 +555,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dailyReviews,
       opportunities,
       backtestEntries,
+      backtestSetups,
       timeDoc,
       strategies,
       trash,
@@ -548,9 +580,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       purgeTrashedOpportunity,
       saveBacktestScreenshot,
       removeBacktestScreenshot,
-      saveBacktestHelper,
       saveBacktestEntry,
       deleteBacktestEntry,
+      saveBacktestSetup,
+      deleteBacktestSetup,
       saveTimeSession,
       deleteTimeSession,
       addTimeCategory,
@@ -564,6 +597,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dailyReviews,
       opportunities,
       backtestEntries,
+      backtestSetups,
       timeDoc,
       strategies,
       trash,
@@ -588,9 +622,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       purgeTrashedOpportunity,
       saveBacktestScreenshot,
       removeBacktestScreenshot,
-      saveBacktestHelper,
       saveBacktestEntry,
       deleteBacktestEntry,
+      saveBacktestSetup,
+      deleteBacktestSetup,
       saveTimeSession,
       deleteTimeSession,
       addTimeCategory,

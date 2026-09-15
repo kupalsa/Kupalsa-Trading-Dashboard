@@ -1109,13 +1109,139 @@ th {
   line-height: 1.5;
 }
 
-.helper-frame {
-  display: block;
-  width: 100%;
-  height: 640px;
+/* --- Backtest trade-logger wizard --- */
+
+.wizard-card {
+  background: var(--bg-panel-2);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  margin-top: 4px;
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.wizard-progress {
+  background: var(--bg-raised);
+  border-radius: 8px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.wizard-progress-bar {
+  background: var(--accent);
+  height: 100%;
+  transition: width 0.25s ease;
+}
+
+.wizard-progress-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+
+.wizard-section-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.wizard-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.wizard-note {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.45;
+  margin: 0 0 16px;
+}
+
+.wizard-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wizard-opt {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.wizard-opt.selected {
+  background: var(--tint-accent);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.wizard-free {
+  display: flex;
+  gap: 8px;
+}
+
+.wizard-free input {
+  flex: 1;
+}
+
+.wizard-nav {
+  margin-top: 18px;
+}
+
+.wizard-nav button {
+  flex: 1;
+}
+
+.wizard-skip {
+  color: var(--text-dim);
+}
+
+.wizard-summary-box {
+  width: 100%;
+  min-height: 320px;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.wizard-copy-status {
+  font-size: 12px;
+  color: var(--green);
+  margin-top: 8px;
+}
+
+.wizard-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: 14px 0 0;
+  line-height: 1.5;
+}
+
+.wizard-editor-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wizard-editor-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wizard-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 8px;
 }
 
 textarea {
@@ -1716,8 +1842,6 @@ textarea {
   .modal.wide { max-width: 100%; }
 
   .backtest-entry-body { grid-template-columns: 1fr; }
-
-  .helper-frame { height: 78vh; }
 
   .history-row {
     grid-template-columns: 78px auto;

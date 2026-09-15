@@ -263,21 +263,3 @@ export function fetchRepoFile(s: AppSettings, path: string): Promise<string> {
 export function forgetRepoFile(s: AppSettings, path: string): void {
   fileCache.delete(`${s.githubOwner}/${s.githubRepo}/${path}`);
 }
-
-/**
- * Fetch a repo file as text rather than a blob URL. Needed for HTML rendered
- * via <iframe srcDoc> — a sandboxed iframe without `allow-same-origin` can't
- * resolve a blob: URL (it fails to load, silently, with no console error),
- * and granting allow-same-origin to load one would give the iframe's script
- * the app's own origin, defeating the sandbox entirely. srcDoc sidesteps the
- * problem: no URL to resolve, so the sandbox stays intact.
- */
-export async function fetchRepoText(s: AppSettings, path: string): Promise<string> {
-  const res = await fetch(`${apiBase(s)}/${path}`, {
-    headers: { ...headers(s), Accept: "application/vnd.github.raw" },
-  });
-  if (!res.ok) {
-    throw new GithubApiError(`Could not load ${path} (${res.status})`, res.status);
-  }
-  return res.text();
-}

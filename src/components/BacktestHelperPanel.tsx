@@ -1,114 +1,197 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useData } from "../lib/DataContext";
-import { fetchRepoText, GithubApiError } from "../lib/githubStore";
-import { backtestHelperPath } from "../lib/strategy";
+import { defaultGldStg1Setup, newBacktestSetup, type LoggerQuestion } from "../lib/backtestSetup";
+import { DEFAULT_STRATEGY_ID } from "../lib/strategy";
+import BacktestWizard from "./BacktestWizard";
+import BacktestSetupEditor from "./BacktestSetupEditor";
+
+const ACTIVE_SETUP_KEY = "trading-dashboard-active-backtest-setup";
+
+function loadActiveMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(ACTIVE_SETUP_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
 
 /**
- * A user-uploaded, self-contained HTML tool (e.g. a trade-logging wizard),
- * rendered inline. The app never parses it — re-uploading just replaces the
- * file, so any future version of the tool works without a code change here.
+ * The native trade-logging wizard: question sequences ("setups") live in repo
+ * data instead of an uploaded HTML file, so multiple setups can exist per
+ * strategy and be switched between or edited in place.
  */
 export default function BacktestHelperPanel({ strategyId }: { strategyId: string }) {
-  const { settings, saveBacktestHelper } = useData();
-  const path = backtestHelperPath(strategyId);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const { backtestSetups, saveBacktestSetup, deleteBacktestSetup } = useData();
+  const setupsHere = backtestSetups.filter((s) => s.strategyId === strategyId);
 
-  const [html, setHtml] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const [activeId, setActiveId] = useState<string | null>(() => loadActiveMap()[strategyId] ?? null);
+  const [editing, setEditing] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [seeded, setSeeded] = useState(false);
+
+  // GLD_STG_1 already had a hand-built 26-question tool before this feature
+  // existed — seed its native equivalent once so nothing is lost, instead of
+  // making the user rebuild it from scratch.
+  useEffect(() => {
+    if (seeded || setupsHere.length > 0 || strategyId !== DEFAULT_STRATEGY_ID) return;
+    setSeeded(true);
+    const setup = defaultGldStg1Setup(strategyId);
+    saveBacktestSetup(setup).then(() => setActiveId(setup.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seeded, setupsHere.length, strategyId]);
+
+  const active = setupsHere.find((s) => s.id === activeId) ?? setupsHere[0] ?? null;
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setLoadError(null);
-    setHtml(null);
-    fetchRepoText(settings, path)
-      .then((text) => {
-        if (!cancelled) setHtml(text);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        // No file uploaded yet is the normal starting state, not an error.
-        if (!(e instanceof GithubApiError && e.status === 404)) {
-          setLoadError(e instanceof Error ? e.message : String(e));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [settings, path, reloadKey]);
+    if (!active) return;
+    const map = loadActiveMap();
+    map[strategyId] = active.id;
+    localStorage.setItem(ACTIVE_SETUP_KEY, JSON.stringify(map));
+  }, [active, strategyId]);
 
-  async function handleFile(file: File) {
-    setUploadError(null);
-    if (!file.name.toLowerCase().endsWith(".html") && file.type !== "text/html") {
-      setUploadError("Please choose an .html file.");
-      return;
-    }
-    setUploading(true);
+  async function createSetup(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    setError(null);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-      await saveBacktestHelper(path, dataUrl.split(",")[1] ?? "");
-      setReloadKey((k) => k + 1);
-    } catch (e) {
-      setUploadError(e instanceof Error ? e.message : String(e));
+      const setup = newBacktestSetup(trimmed, strategyId);
+      await saveBacktestSetup(setup);
+      setActiveId(setup.id);
+      setCreating(false);
+      setNewName("");
+      setEditing(true); // a brand-new setup starts with no questions — go straight to adding them
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setUploading(false);
+      setBusy(false);
     }
   }
 
-  const hasTool = Boolean(html);
+  async function saveQuestions(questions: LoggerQuestion[]) {
+    if (!active) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await saveBacktestSetup({ ...active, questions });
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeActiveSetup() {
+    if (!active) return;
+    if (!confirm(`Delete "${active.name}"? This can't be undone.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteBacktestSetup(active.id);
+      setActiveId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="panel">
-      <h2>Trade Logger Tool</h2>
-      <p className="small-note" style={{ marginTop: 0 }}>
-        Upload a self-contained HTML tool to help log opportunities. It runs right here — re-upload
-        anytime a new version replaces the old one.
-      </p>
+      <h2>{active ? active.name : "Trade Logger"}</h2>
 
-      <div className="row" style={{ marginBottom: 12 }}>
-        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}>
-          {uploading ? "Uploading…" : hasTool ? "Replace file" : "Upload .html file"}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".html,text/html"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFile(file);
-            e.target.value = "";
-          }}
-        />
-        {uploadError && <span className="error-text">{uploadError}</span>}
+      <div className="row" style={{ marginBottom: 12, flexWrap: "wrap" }}>
+        {setupsHere.length > 1 && (
+          <select
+            value={active?.id ?? ""}
+            onChange={(e) => {
+              setActiveId(e.target.value);
+              setEditing(false);
+            }}
+            style={{ maxWidth: 220 }}
+          >
+            {setupsHere.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
+        {active && !editing && (
+          <button type="button" onClick={() => setEditing(true)}>
+            Edit questions
+          </button>
+        )}
+        {active && !editing && setupsHere.length > 0 && (
+          <button type="button" className="danger" onClick={removeActiveSetup} disabled={busy}>
+            Delete setup
+          </button>
+        )}
+        {!creating && (
+          <button type="button" onClick={() => setCreating(true)}>
+            + New setup
+          </button>
+        )}
       </div>
 
-      {loading && <p className="small-note">Loading…</p>}
-      {loadError && <p className="error-text">{loadError}</p>}
-      {!loading && !loadError && !hasTool && (
-        <p className="muted">No tool uploaded yet for this strategy.</p>
+      {creating && (
+        <form onSubmit={createSetup} className="row" style={{ marginBottom: 12 }}>
+          <input
+            autoFocus
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Setup name"
+            style={{ maxWidth: 220 }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setCreating(false);
+                setNewName("");
+              }
+            }}
+          />
+          <button type="submit" className="primary" disabled={busy || !newName.trim()}>
+            {busy ? "Creating…" : "Create"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCreating(false);
+              setNewName("");
+            }}
+            disabled={busy}
+          >
+            Cancel
+          </button>
+        </form>
       )}
 
-      {hasTool && (
-        <iframe
-          srcDoc={html ?? undefined}
-          className="helper-frame"
-          sandbox="allow-scripts allow-forms"
-          title="Backtest helper tool"
+      {error && <div className="error-text" style={{ marginBottom: 10 }}>{error}</div>}
+
+      {!active && !creating && (
+        <p className="muted">No trade-logger setup yet for this strategy — create one above.</p>
+      )}
+
+      {active && editing && (
+        <BacktestSetupEditor
+          setup={active}
+          saving={busy}
+          onSave={saveQuestions}
+          onCancel={() => setEditing(false)}
         />
       )}
+
+      {active && !editing && <BacktestWizard setup={active} />}
+
+      <p className="wizard-hint">
+        📸 Attach the trade's closing screenshot in the chat along with this summary when you paste
+        it — Claude reads the price levels, direction and setup colour from that image.
+      </p>
     </div>
   );
 }
