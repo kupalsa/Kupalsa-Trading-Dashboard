@@ -66,110 +66,6 @@ export function newBacktestSetup(name: string, strategyId: string): BacktestSetu
   };
 }
 
-/**
- * The GLD_STG_1 26-question logger, ported from the previously-uploaded HTML
- * tool, plus the 4H-confluence question added 2026-09-15: a zone alone isn't
- * a trade — it only counts if a 4H+ Wyckoff process line (support/resistance)
- * backs both the entry and the stop. Without that, the setup is skipped
- * rather than logged as "Stood down", since it never qualified as a trade.
- */
-export function defaultGldStg1Setup(strategyId: string): BacktestSetup {
-  const q = (
-    section: string,
-    title: string,
-    note: string,
-    type: LoggerQuestionType,
-    options: string[] = [],
-  ): LoggerQuestion => ({ id: crypto.randomUUID(), section, title, note, type, options });
-
-  return {
-    id: crypto.randomUUID(),
-    strategyId,
-    name: "GLD_STG_1 Trade Logger",
-    createdAt: new Date().toISOString(),
-    questions: [
-      q("ZONES", "Date", "The actual trade / replay date.", "date"),
-      q("ZONES", "Entry zone — side", "", "choice", ["Upper", "Lower"]),
-      q("ZONES", "Entry zone — type", "", "choice", ["Wick", "Body"]),
-      q(
-        "ZONES",
-        "Entry zone — state at entry",
-        "Decides the setup: Unfilled → Reversal · Tagged & intact → Continuation · Broken → Break Continuation",
-        "choice",
-        ["Unfilled", "Tagged & intact", "Broken"],
-      ),
-      q(
-        "CONFLUENCE",
-        "4H+ support at entry & stop?",
-        "A Wyckoff process line (support/resistance), 4H timeframe or higher, must back both the entry and the stop. The zone alone is just today's timing — without this confluence it isn't a trade at all, so log it as No and stop here.",
-        "choice",
-        ["Yes", "No"],
-      ),
-      q("ZONES", "Target zone — type", "", "choice", ["Wick", "Body"]),
-      q("ZONES", "Target zone — broken by end?", "Did price close through it by 23:05.", "choice", [
-        "Yes",
-        "No",
-      ]),
-      q("ZONES", "2nd upper zone existed?", "", "choice", ["Yes", "No"]),
-      q("ZONES", "2nd lower zone existed?", "", "choice", ["Yes", "No"]),
-      q("TIMING", "Entry time", "Israel time.", "time"),
-      q("TIMING", "Exit time", "Israel time.", "time"),
-      q("TIMING", "17:00 close changed zones?", "", "choice", ["Yes", "No", "NA"]),
-      q("SETUP", "Arrival", "", "choice", ["Impulsive", "Mixed", "Drift"]),
-      q("SETUP", "FVG present at entry?", "", "choice", ["Yes", "No"]),
-      q("SETUP", "Wyckoff phase — higher timeframe", "", "choice", ["A", "B", "C", "D", "E"]),
-      q("SETUP", "Wyckoff phase — lower timeframe", "", "choice", ["A", "B", "C", "D", "E"]),
-      q(
-        "SETUP",
-        "Stood down type",
-        "'None' = you traded, or placed an order in good faith.",
-        "choice",
-        ["None", "Phase E - ran away", "No quality stop", "Gap zone - untradeable"],
-      ),
-      q("FILL & OUTCOME", "Natural entry filled?", "", "choice", ["Yes", "No"]),
-      q("FILL & OUTCOME", "Natural outcome", "", "choice", ["Win", "Loss", "Breakeven", "NA"]),
-      q("FILL & OUTCOME", "Optimized entry filled?", "", "choice", ["Yes", "No"]),
-      q("FILL & OUTCOME", "Optimized outcome", "", "choice", ["Win", "Loss", "Breakeven", "NA"]),
-      q(
-        "FILL & OUTCOME",
-        "Swing natural outcome",
-        "Swing runs to next day's 23:05.",
-        "choice",
-        ["Win", "Loss", "Breakeven", "NA", "Don't know yet"],
-      ),
-      q("FILL & OUTCOME", "Swing optimized outcome", "", "choice", [
-        "Win",
-        "Loss",
-        "Breakeven",
-        "NA",
-        "Don't know yet",
-      ]),
-      q(
-        "STOP QUALITY",
-        "Stop timeframe",
-        "Highest timeframe with a real structural point behind the stop. Hard cap 25pts, ceiling 30pts.",
-        "choice",
-        ["4H", "1H", "15m"],
-      ),
-      q(
-        "STOP QUALITY",
-        "Stop support type",
-        "Swing = a swing point (the normal case). FVG = rare, high-conviction only.",
-        "choice",
-        ["Swing", "FVG"],
-      ),
-      q(
-        "EXIT",
-        "Natural exit type",
-        "If Forced close, remember to tell Claude the actual close price separately when you paste this.",
-        "choice",
-        ["TP hit", "Stop hit", "Forced close", "Not filled"],
-      ),
-      q("EXIT", "Optimized exit type", "", "choice", ["TP hit", "Stop hit", "Forced close", "Not filled"]),
-    ],
-  };
-}
-
 const CANDLE_TYPES = [
   "Marubozu",
   "Strong-body / trend",
@@ -182,14 +78,16 @@ const CANDLE_TYPES = [
 ];
 
 /**
- * GLD_STG_2's 37-question logger, per the spec handed over from the STG_2
- * backtest chat (2026-09-24) — a rebuild after drifting from the live
- * process: trade the move between the closest unfilled 4H gap above and
- * below price (verified on 1H), executed on 5m. Unlike STG_1: no
- * Natural/Optimized split, no swing tracking, no 4H-confluence gate, and a
- * two-state (not three-state) Setup Type — plus new gap-quality tracking.
+ * GLD_STG_1's 37-question logger, corrected 2026-09-24: the original
+ * "zones" wording undersold the actual live process, which is really about
+ * trading the move between the closest unfilled 4H gap above and below
+ * price (verified on 1H), executed on 5m. This replaces the earlier
+ * 26/27-question zones-based draft outright — no Natural/Optimized split,
+ * no swing tracking, no 4H-confluence gate, a two-state (not three-state)
+ * Setup Type, plus new gap-quality tracking. This is a backtest-wizard
+ * change only; the strategy's live trading data is untouched.
  */
-export function defaultGldStg2Setup(strategyId: string): BacktestSetup {
+export function defaultGldStg1Setup(strategyId: string): BacktestSetup {
   const q = (
     section: string,
     title: string,
@@ -220,7 +118,7 @@ export function defaultGldStg2Setup(strategyId: string): BacktestSetup {
   return {
     id: crypto.randomUUID(),
     strategyId,
-    name: "GLD_STG_2 Trade Logger",
+    name: "GLD_STG_1 Trade Logger",
     createdAt: new Date().toISOString(),
     questions: [
       q("GAPS", "Date", "The actual trade / replay date.", "date"),

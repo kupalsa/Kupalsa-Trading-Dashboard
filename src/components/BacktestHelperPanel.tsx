@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useData } from "../lib/DataContext";
 import {
   defaultGldStg1Setup,
-  defaultGldStg2Setup,
   newBacktestSetup,
   type BacktestSetup,
   type LoggerQuestion,
@@ -13,14 +12,12 @@ import BacktestSetupEditor from "./BacktestSetupEditor";
 const ACTIVE_SETUP_KEY = "trading-dashboard-active-backtest-setup";
 
 /**
- * Strategies with a hand-built logger that pre-dated this feature (or a
- * spec handed over from a strategy's own planning chat) get their question
- * set seeded automatically by exact name match, instead of making the user
- * rebuild dozens of questions from scratch through the editor.
+ * Strategies with a hand-built logger that pre-dated this feature get their
+ * question set seeded automatically by exact name match, instead of making
+ * the user rebuild dozens of questions from scratch through the editor.
  */
 const SEED_BY_STRATEGY_NAME: Record<string, (strategyId: string) => BacktestSetup> = {
   GLD_STG_1: defaultGldStg1Setup,
-  GLD_STG_2: defaultGldStg2Setup,
 };
 
 function loadActiveMap(): Record<string, string> {
