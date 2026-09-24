@@ -41,7 +41,7 @@ export default function BacktestPage() {
 
       {loading && <p className="muted">Loading…</p>}
 
-      <BacktestHelperPanel strategyId={strategy.id} />
+      <BacktestHelperPanel strategyId={strategy.id} strategyName={strategy.name} />
       <BacktestEntryList strategyId={strategy.id} />
     </div>
   );

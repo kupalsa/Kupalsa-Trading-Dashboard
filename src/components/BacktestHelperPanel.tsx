@@ -1,11 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useData } from "../lib/DataContext";
-import { defaultGldStg1Setup, newBacktestSetup, type LoggerQuestion } from "../lib/backtestSetup";
-import { DEFAULT_STRATEGY_ID } from "../lib/strategy";
+import {
+  defaultGldStg1Setup,
+  defaultGldStg2Setup,
+  newBacktestSetup,
+  type BacktestSetup,
+  type LoggerQuestion,
+} from "../lib/backtestSetup";
 import BacktestWizard from "./BacktestWizard";
 import BacktestSetupEditor from "./BacktestSetupEditor";
 
 const ACTIVE_SETUP_KEY = "trading-dashboard-active-backtest-setup";
+
+/**
+ * Strategies with a hand-built logger that pre-dated this feature (or a
+ * spec handed over from a strategy's own planning chat) get their question
+ * set seeded automatically by exact name match, instead of making the user
+ * rebuild dozens of questions from scratch through the editor.
+ */
+const SEED_BY_STRATEGY_NAME: Record<string, (strategyId: string) => BacktestSetup> = {
+  GLD_STG_1: defaultGldStg1Setup,
+  GLD_STG_2: defaultGldStg2Setup,
+};
 
 function loadActiveMap(): Record<string, string> {
   try {
@@ -21,7 +37,13 @@ function loadActiveMap(): Record<string, string> {
  * data instead of an uploaded HTML file, so multiple setups can exist per
  * strategy and be switched between or edited in place.
  */
-export default function BacktestHelperPanel({ strategyId }: { strategyId: string }) {
+export default function BacktestHelperPanel({
+  strategyId,
+  strategyName,
+}: {
+  strategyId: string;
+  strategyName: string;
+}) {
   const { backtestSetups, saveBacktestSetup, deleteBacktestSetup } = useData();
   const setupsHere = backtestSetups.filter((s) => s.strategyId === strategyId);
 
@@ -31,18 +53,23 @@ export default function BacktestHelperPanel({ strategyId }: { strategyId: string
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [seeded, setSeeded] = useState(false);
-
-  // GLD_STG_1 already had a hand-built 26-question tool before this feature
-  // existed — seed its native equivalent once so nothing is lost, instead of
-  // making the user rebuild it from scratch.
+  // Switching strategies (via the Backtest page's dropdown) doesn't remount
+  // this component, so both the remembered active setup and the seeding
+  // guard below must react to strategyId changing, not just run once.
+  const seededIds = useRef(new Set<string>());
   useEffect(() => {
-    if (seeded || setupsHere.length > 0 || strategyId !== DEFAULT_STRATEGY_ID) return;
-    setSeeded(true);
-    const setup = defaultGldStg1Setup(strategyId);
+    setActiveId(loadActiveMap()[strategyId] ?? null);
+    setEditing(false);
+  }, [strategyId]);
+
+  useEffect(() => {
+    const seedFn = SEED_BY_STRATEGY_NAME[strategyName.trim()];
+    if (seededIds.current.has(strategyId) || setupsHere.length > 0 || !seedFn) return;
+    seededIds.current.add(strategyId);
+    const setup = seedFn(strategyId);
     saveBacktestSetup(setup).then(() => setActiveId(setup.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seeded, setupsHere.length, strategyId]);
+  }, [setupsHere.length, strategyId, strategyName]);
 
   const active = setupsHere.find((s) => s.id === activeId) ?? setupsHere[0] ?? null;
 
